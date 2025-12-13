@@ -1,6 +1,5 @@
-# coding: utf-8
 from flask import jsonify, request
-from flask_restx import Resource, fields
+from flask_restx import Resource
 from flask_restx.namespace import Namespace
 from controlei.util.util import get_dict_retorno_endpoint
 from .model.controlei_usuario_model import generate_usuario_model
@@ -22,7 +21,6 @@ put_usuario_model = generate_usuario_model(api, "put")
 post_usuario_model = generate_usuario_model(api, "post")
 
 
-# Parser para GET com filtro
 model_get_user = api.parser().add_argument(
     name='nome',
     type=str,
@@ -76,26 +74,26 @@ class UsuarioCollection(Resource):
         )
 
 
-@api.route('/<int:user_id>')
+@api.route('/<int:id_usuario>')
 class UsuarioDetail(Resource):
-    def get(self, user_id):
+    def get(self, id_usuario):
         """Obtém um usuário por ID"""
         facade = user_f()
-        usuario = facade.dao.get_user_by_id(user_id)
+        usuario = facade.dao.get_user_by_id(id_usuario)
 
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, usuario)
         )
 
-    def delete(self, user_id):
+    def delete(self, id_usuario):
         """Deleta um usuário"""
         facade = user_f()
-        facade.deletar_usuario(user_id)
+        facade.deletar_usuario(id_usuario)
 
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS,
-                'Usuário deletado com sucesso',
-                {'id': user_id})
+                MSG_SUCESSO,
+                None)
         )

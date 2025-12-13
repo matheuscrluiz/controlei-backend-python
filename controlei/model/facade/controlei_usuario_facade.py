@@ -9,16 +9,6 @@ class ControleiUserFacade():
         """construtor da classe ControleiUserFacade"""
         self.dao = ControleiUserDAO()
 
-    # --------------------------------------------------------------------------
-    # DATABASE COMMIT
-    # --------------------------------------------------------------------------
-    def database_commit(self):
-        """Realiza commit na base de dados"""
-        self.dao.database_commit()
-
-    # --------------------------------------------------------------------------
-    # OBTER USUARIO
-    # --------------------------------------------------------------------------
     def obter_usuario(self, nome=None) -> dict:
         rotina = 'obter_usuario'
 
@@ -31,9 +21,6 @@ class ControleiUserFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    # --------------------------------------------------------------------------
-    # CRIAR USUARIO
-    # --------------------------------------------------------------------------
     def criar_usuario(self, parm_dict: dict):
         rotina = 'criar_usuario'
 
@@ -60,9 +47,6 @@ class ControleiUserFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    # --------------------------------------------------------------------------
-    # ATUALIZAR USUARIO
-    # --------------------------------------------------------------------------
     def atualizar_usuario(self, parm_dict: dict):
         rotina = 'atualizar_usuario'
 
@@ -78,37 +62,27 @@ class ControleiUserFacade():
                 raise FacadeException(
                     __file__, rotina, 'Usuário não encontrado')
 
-            # Atualizar usuário
             self.dao.update_usuario(parm_dict)
             self.dao.database_commit()
-
-            return True
-
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    # --------------------------------------------------------------------------
-    # DELETAR USUARIO
-    # --------------------------------------------------------------------------
-    def deletar_usuario(self, user_id: int):
+    def deletar_usuario(self, id_usuario: int):
         rotina = 'deletar_usuario'
 
         try:
-            if not user_id:
+            if not id_usuario:
                 raise FacadeException(
                     __file__, rotina, 'ID do usuário é obrigatório')
 
             # Verificar se usuário existe
-            usuario = self.dao.get_user_by_id(user_id=user_id)
+            usuario = self.dao.get_user_by_id(id_usuario=id_usuario)
             if not usuario:
                 raise FacadeException(
                     __file__, rotina, 'Usuário não encontrado')
 
-            # Deletar usuário
-            self.dao.delete_usuario(user_id)
+            self.dao.delete_usuario(id_usuario)
             self.dao.database_commit()
-
-            return True
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)

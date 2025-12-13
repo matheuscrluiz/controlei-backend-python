@@ -120,16 +120,16 @@ class ControleiUserDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def delete_usuario(self, user_id: int):
+    def delete_usuario(self, id_usuario: int):
         rotina = 'delete_usuario'
 
         try:
             cmdSql = """
                 DELETE FROM usuario
-                WHERE id = %(id)s
+                WHERE id_usuario = %(id_usuario)s
             """
 
-            params = {'id': user_id}
+            params = {'id_usuario': id_usuario}
 
             self.execute_dml_command_parms(cmdSql, params)
 
