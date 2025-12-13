@@ -1,6 +1,6 @@
 from flask_restx import fields
 
-from ...util.constants import NOM_AREA
+from ....util.constants import NOM_AREA
 
 
 MODEL_AREA = {

@@ -5,7 +5,7 @@ from flask_restx.namespace import Namespace
 
 from controlei.util.util import get_dict_retorno_endpoint
 from ...util.constants import MSG_SUCESSO, TIP_RETORNO_SUCESS
-from .api_model import MODEL_AREA
+from .model.api_model import MODEL_AREA
 from ...model.facade.area_facade import AreaFacade as area_f
 # ---------------------------->>
 # NameSpace

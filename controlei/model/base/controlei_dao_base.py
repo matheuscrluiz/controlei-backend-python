@@ -8,7 +8,7 @@ from ...util.constants import (
     DATABASE_PORT
 )
 import psycopg2
-import os
+import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -51,10 +51,25 @@ class DAOBase:
     # ----------------------------------------------------------------------
 
     def convert_dataframe_to_dict(self, dataframe):
-        """
-        Converte o dataframe retornado pelo pandas em uma lista de dicts.
-        """
-        return dataframe.to_dict(orient="records")
+        df = dataframe.copy()
+
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                # 1️⃣ força para object
+                df[col] = df[col].astype(object)
+
+                # 2️⃣ NaT -> None
+                df[col] = df[col].where(pd.notna(df[col]), None)
+
+                # 3️⃣ datetime -> ISO string
+                df[col] = df[col].apply(
+                    lambda x: x.isoformat() if x is not None else None
+                )
+            else:
+                # outras colunas
+                df[col] = df[col].where(pd.notnull(df[col]), None)
+
+        return df.to_dict(orient="records")
 
     # ------------------------------------------------------------------
 
