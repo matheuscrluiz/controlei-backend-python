@@ -10,6 +10,7 @@ from ..api.controlei_usuario_api import api as controlei_usuario_api
 from ..api.controlei_categoria_api import api as controlei_categoria_api
 from ..api.controlei_meio_pagamento_api import (
     api as controlei_meio_pagamento_api)
+from ..api.controlei_receita_api import api as controlei_receita_api
 # ---------------------------->>
 # Constants
 # ---------------------------->>
@@ -61,6 +62,7 @@ api.add_namespace(area_api)
 api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
 api.add_namespace(controlei_meio_pagamento_api)
+api.add_namespace(controlei_receita_api)
 # ---------------------------->>
 # Inicializa a aplicação
 # ---------------------------->>
