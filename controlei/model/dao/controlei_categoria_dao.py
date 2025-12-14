@@ -62,7 +62,7 @@ class ControleiCategoriaDAO(base.DAOBase):
             cmdSql = """
                 UPDATE categoria
                 SET tipo_categoria        = %(tipo_categoria)s,
-                    dsc_categoria       = %(dsc_categoria)s,
+                    dsc_categoria       = %(dsc_categoria)s
                 WHERE id_categoria = %(id_categoria)s
             """
 
