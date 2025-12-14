@@ -26,8 +26,6 @@ class ControleiUserDAO(base.DAOBase):
 
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params_oracle)
-            print(dataframe[['alterado_em']])
-            print(type(dataframe.iloc[0]['alterado_em']))
 
             return self.convert_dataframe_to_dict(dataframe)
 
