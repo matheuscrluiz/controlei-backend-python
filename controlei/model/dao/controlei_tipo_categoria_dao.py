@@ -41,7 +41,7 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
                 INSERT INTO tipo_categoria (dsc_tipo_categoria,
                 codigo_tipo_categoria)
                 VALUES (%(dsc_tipo_categoria)s, %(codigo_tipo_categoria)s)
-                returning id_categoria
+                returning id_tipo_categoria
             """
 
             parms_oracle = {
@@ -49,8 +49,9 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
                 "dsc_tipo_categoria": parm_dict["dsc_tipo_categoria"]
             }
 
-            id_categoria = self.execute_dml_command_parms(cmdSql, parms_oracle)
-            return id_categoria
+            id_tipo_categoria = self.execute_dml_command_parms(
+                cmdSql, parms_oracle)
+            return id_tipo_categoria
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
