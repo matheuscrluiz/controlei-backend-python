@@ -11,7 +11,8 @@ from ...model.facade.controlei_tipo_categoria_facade import (
 # NameSpace
 # ---------------------------->>
 
-api = Namespace('controlei-categoria', description='Tabela de categoria')
+api = Namespace('controlei-tipo-categoria',
+                description='Tabela de tipo de categoria')
 
 
 # ---------------------------->>
