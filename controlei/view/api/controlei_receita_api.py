@@ -83,7 +83,7 @@ class ControleiMeioPagamento(Resource):
         """Atualiza uma receita de um usuário"""
         parm_dict = request.get_json()
 
-        rec_f().atualizar_categoria(parm_dict)
+        rec_f().atualizar_receita(parm_dict)
 
         return jsonify(
             get_dict_retorno_endpoint(

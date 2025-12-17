@@ -140,5 +140,5 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-
-nome_do_projeto/*.bat
+*.bat
+controlei/*.bat

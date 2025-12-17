@@ -22,9 +22,9 @@ post_usuario_model = generate_usuario_model(api, "post")
 
 
 model_get_user = api.parser().add_argument(
-    name='nome',
+    name='ch_rede',
     type=str,
-    help="Nome do usuário"
+    help="ch_rede do usuário"
 )
 
 # ---------------------------->>
@@ -37,8 +37,8 @@ class UsuarioCollection(Resource):
     @api.expect(model_get_user, validate=True)
     def get(self):
         """Obtém todos usuários ou um usuário específico"""
-        nome = request.args.get('nome')
-        result = user_f().obter_usuario(nome)
+        ch_rede = request.args.get('ch_rede')
+        result = user_f().obter_usuario(ch_rede)
 
         return jsonify(
             get_dict_retorno_endpoint(

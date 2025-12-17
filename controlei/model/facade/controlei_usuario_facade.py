@@ -9,13 +9,13 @@ class ControleiUserFacade():
         """construtor da classe ControleiUserFacade"""
         self.dao = ControleiUserDAO()
 
-    def obter_usuario(self, nome=None) -> dict:
+    def obter_usuario(self, ch_rede=None) -> dict:
         rotina = 'obter_usuario'
 
         try:
-            if nome is not None:
-                nome = nome.strip()
-            user = self.dao.get_user(nome=nome)
+            if ch_rede is not None:
+                ch_rede = ch_rede.strip()
+            user = self.dao.get_user(ch_rede=ch_rede)
             return convert_unique_dic_to_arrayDict(user)
 
         except Exception as erro:
@@ -25,20 +25,12 @@ class ControleiUserFacade():
         rotina = 'criar_usuario'
 
         try:
-            email = parm_dict.get('email')
-            nome = parm_dict.get('nome')
 
-            if not email or not nome:
-                raise FacadeException(
-                    __file__, rotina, 'Email e nome são obrigatórios')
-
-            # Verificar se email já existe
-            usuario_existente = self.dao.get_user_by_email(email=email)
+            usuario_existente = self.dao.get_user(ch_rede=parm_dict['ch_rede'])
             if usuario_existente:
                 raise FacadeException(
-                    __file__, rotina, 'Esse e-mail já existe')
+                    __file__, rotina, 'Esse usuário já existe')
 
-            # Inserir novo usuário
             user_id = self.dao.insert_usuario(parm_dict)
             self.dao.database_commit()
 
