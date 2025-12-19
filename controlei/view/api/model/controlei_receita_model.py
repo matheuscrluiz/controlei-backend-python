@@ -7,9 +7,9 @@ def generate_receita_model(api: Namespace, type: str) -> Model:
             required=True,
             description="ID da categoria"
         ),
-        'id_usuario': fields.Integer(
+        'ch_rede': fields.String(
             required=True,
-            description="ID do usuário"
+            description="Chave de rede do usuário"
         ),
         'dsc_receita': fields.String(
             required=False,

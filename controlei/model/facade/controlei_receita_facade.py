@@ -13,14 +13,14 @@ class ControleiReceitaFacade():
         self.cat_dao = ControleiCategoriaDAO()
         self.user_dao = ControleiUserDAO()
 
-    def obter_receita(self, id_receita=None, id_usuario=None) -> dict:
+    def obter_receita(self, id_receita=None, ch_rede=None) -> dict:
         rotina = 'obter_receita'
 
         try:
 
             receita = self.dao.get_income(
                 id_receita=id_receita,
-                id_usuario=id_usuario)
+                ch_rede=ch_rede)
             return convert_unique_dic_to_arrayDict(receita)
 
         except Exception as erro:

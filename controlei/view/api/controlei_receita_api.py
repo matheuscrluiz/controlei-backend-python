@@ -27,9 +27,9 @@ model_get_income = api.parser().add_argument(
     type=int,
     help="ID da receita"
 ).add_argument(
-    name='id_usuario',
-    type=int,
-    help="ID do usuário",
+    name='ch_rede',
+    type=str,
+    help="Chave de rede do usuário",
     required=True
 )
 model_delete_income = api.parser().add_argument(
@@ -38,9 +38,9 @@ model_delete_income = api.parser().add_argument(
     help="ID da receita",
     required=True
 ).add_argument(
-    name='id_usuario',
+    name='ch_rede',
     type=int,
-    help="ID do usuário",
+    help="Chave de rede do usuário",
     required=True
 )
 
@@ -55,9 +55,9 @@ class ControleiMeioPagamento(Resource):
     def get(self):
         """Obtém uma ou todas as receitas do usuário"""
         id_receita = request.args.get('id_receita')
-        id_usuario = request.args.get('id_usuario')
+        ch_rede = request.args.get('ch_rede')
         result = rec_f().obter_receita(
-            id_receita, id_usuario)
+            id_receita, ch_rede)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -96,9 +96,9 @@ class ControleiMeioPagamento(Resource):
     def delete(self):
         """Deleta uma receita de um usuário"""
         id_receita = request.args.get('id_receita')
-        id_usuario = request.args.get('id_usuario')
+        ch_rede = request.args.get('ch_rede')
         rec_f().apagar_receita(
-            id_receita, id_usuario)
+            id_receita, ch_rede)
 
         return jsonify(
             get_dict_retorno_endpoint(
