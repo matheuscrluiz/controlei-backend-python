@@ -48,7 +48,7 @@ class ControleiCategoria(Resource):
 
     @api.expect(post_tipo_categoria_model, validate=True)
     def post(self):
-        """Cria uma nova categoria"""
+        """Cria um novo tipo de categoria"""
         parm_dict = request.get_json()
 
         id_tipo_categoria = tipo_f().criar_tipo_categoria(parm_dict)
@@ -62,7 +62,7 @@ class ControleiCategoria(Resource):
 
     @api.expect(put_tipo_categoria_model, validate=True)
     def put(self):
-        """Atualiza uma categoria existente"""
+        """Atualiza um tipo de categoria existente"""
         parm_dict = request.get_json()
 
         tipo_f().atualizar_tipo_categoria(parm_dict)
