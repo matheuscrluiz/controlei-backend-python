@@ -11,7 +11,7 @@ class ControleiReceitaDAO(base.DAOBase):
     def get_income(
             self,
             id_receita: int = None,
-            id_usuario: int = None) -> dict:
+            ch_rede: str = None) -> dict:
         rotina = 'get_income'
 
         try:
@@ -20,8 +20,8 @@ class ControleiReceitaDAO(base.DAOBase):
                 SELECT
                     r.id_receita,
                     r.id_categoria,
-                    r.id_usuario,
                     u.nome,
+                    u.ch_rede,
                     r.dsc_receita,
                     r.valor,
                     r.data_recebimento,
@@ -29,11 +29,11 @@ class ControleiReceitaDAO(base.DAOBase):
                     r.origem_receita
                 FROM receita r
                 join usuario u
-                    on r.id_usuario = u.id_usuario
-                where r.id_usuario = %(id_usuario)s
+                    on r.ch_rede = u.ch_rede
+                where r.ch_rede = %(ch_rede)s
             """
 
-            params_oracle = {"id_usuario": id_usuario}
+            params_oracle = {"ch_rede": ch_rede}
 
             if id_receita:
                 query += " and id_receita = %(id_receita)s"
