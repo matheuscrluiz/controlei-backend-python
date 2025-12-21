@@ -8,21 +8,29 @@ class ControleiCategoriaDAO(base.DAOBase):
     def __init__(self):
         super().__init__()
 
-    def get_category(self, id_categoria: int = None):
+    def get_category(
+            self,
+            id_categoria: int = None,
+            id_tipo_categoria: int = None):
         rotina = 'get_category'
 
         try:
 
             query = """
-                select * from categoria
+                select c.*, t.* from categoria c
+                join tipo_categoria t
+                    on t.id_tipo_categoria = c.id_tipo_categoria
                 where 1=1
             """
 
             params_oracle = {}
 
             if id_categoria:
-                query += " and id_categoria = %(id_categoria)s"
+                query += " and c.id_categoria = %(id_categoria)s"
                 params_oracle['id_categoria'] = id_categoria
+            if id_tipo_categoria:
+                query += " and t.id_tipo_categoria = %(id_tipo_categoria)s"
+                params_oracle['id_tipo_categoria'] = id_tipo_categoria
 
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params_oracle)
@@ -38,15 +46,14 @@ class ControleiCategoriaDAO(base.DAOBase):
         try:
 
             cmdSql = """
-                INSERT INTO categoria (dsc_categoria,
-                tipo_categoria)
-                VALUES (%(dsc_categoria)s, %(tipo_categoria)s)
+                INSERT INTO categoria (dsc_categoria, id_tipo_categoria)
+                VALUES (%(dsc_categoria)s, %(id_tipo_categoria)s)
                 returning id_categoria
             """
 
             parms_oracle = {
-                "tipo_categoria": parm_dict.get("tipo_categoria"),
-                "dsc_categoria": parm_dict.get("dsc_categoria")
+                "dsc_categoria": parm_dict.get("dsc_categoria"),
+                "id_tipo_categoria": parm_dict.get("id_tipo_categoria")
             }
 
             id_categoria = self.execute_dml_command_parms(cmdSql, parms_oracle)
@@ -61,14 +68,13 @@ class ControleiCategoriaDAO(base.DAOBase):
         try:
             cmdSql = """
                 UPDATE categoria
-                SET tipo_categoria        = %(tipo_categoria)s,
+                SET
                     dsc_categoria       = %(dsc_categoria)s
                 WHERE id_categoria = %(id_categoria)s
             """
 
             params = {
                 "id_categoria": parm_dict['id_categoria'],
-                "tipo_categoria": parm_dict['tipo_categoria'],
                 "dsc_categoria": parm_dict['dsc_categoria']
             }
 
@@ -77,16 +83,21 @@ class ControleiCategoriaDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def delete_categoria(self, id_categoria: int):
+    def delete_categoria(
+            self,
+            id_categoria: int,
+            id_tipo_categoria: int):
         rotina = 'delete_categoria'
 
         try:
             cmdSql = """
                 DELETE FROM categoria
                 WHERE id_categoria = %(id_categoria)s
+                and id_tipo_categoria = %(id_tipo_categoria)s
             """
 
-            params = {'id_categoria': id_categoria}
+            params = {'id_categoria': id_categoria,
+                      'id_tipo_categoria': id_tipo_categoria}
 
             self.execute_dml_command_parms(cmdSql, params)
 

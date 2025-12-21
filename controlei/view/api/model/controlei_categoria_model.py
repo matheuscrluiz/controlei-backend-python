@@ -7,9 +7,9 @@ def generate_categoria_model(api: Namespace, type: str) -> Model:
             required=True,
             description="Dsc. do categoria"
         ),
-        'tipo_categoria': fields.String(
+        'id_tipo_categoria': fields.Integer(
             required=True,
-            description="Tipo da categoria"
+            description="ID do tipo de categoria"
         ),
 
     }

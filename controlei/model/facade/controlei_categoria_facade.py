@@ -9,12 +9,16 @@ class ControleiCategoriaFacade():
         """construtor da classe ControleiUserFacade"""
         self.dao = ControleiCategoriaDAO()
 
-    def obter_categoria(self, id_categoria=None) -> dict:
+    def obter_categoria(
+            self,
+            id_categoria=None,
+            id_tipo_categoria=None) -> dict:
         rotina = 'obter_categoria'
 
         try:
 
-            categoria = self.dao.get_category(id_categoria=id_categoria)
+            categoria = self.dao.get_category(
+                id_categoria=id_categoria, id_tipo_categoria=id_tipo_categoria)
             return convert_unique_dic_to_arrayDict(categoria)
 
         except Exception as erro:
@@ -24,13 +28,6 @@ class ControleiCategoriaFacade():
         rotina = 'criar_categoria'
 
         try:
-            tipos_categoria_aceito = ['Receita', 'Despesa']
-            if parm_dict['tipo_categoria'] not in tipos_categoria_aceito:
-                raise FacadeException(
-                    __file__,
-                    rotina,
-                    "O tipo da categoria deve ser Receita ou Despesa"
-                )
 
             id_categoria = self.dao.insert_categoria(parm_dict)
             self.dao.database_commit()
@@ -55,15 +52,26 @@ class ControleiCategoriaFacade():
                 raise FacadeException(
                     __file__, rotina, 'Categoria não encontrado')
 
-            tipos_categoria_aceito = ['Receita', 'Despesa']
-            if parm_dict['tipo_categoria'] not in tipos_categoria_aceito:
-                raise FacadeException(
-                    __file__,
-                    rotina,
-                    "O tipo da categoria deve ser Receita ou Despesa"
-                )
-
             self.dao.update_categoria(parm_dict)
+            self.dao.database_commit()
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def apagar_categoria(self, id_categoria: int, id_tipo_categoria: int):
+        rotina = 'apagar_categoria'
+
+        try:
+            if not id_categoria:
+                raise FacadeException(
+                    __file__, rotina, 'ID da categoria é obrigatório')
+
+            categoria = self.dao.get_category(
+                id_categoria=id_categoria)
+            if not categoria:
+                raise FacadeException(
+                    __file__, rotina, 'Categoria não encontrado')
+
+            self.dao.delete_categoria(id_categoria, id_tipo_categoria)
             self.dao.database_commit()
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
