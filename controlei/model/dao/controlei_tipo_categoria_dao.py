@@ -8,7 +8,7 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
     def __init__(self):
         super().__init__()
 
-    def get_type_category(self, id_tipo_categoria: int = None):
+    def get_type_category(self, id_tipo_categoria: int = None) -> dict:
         rotina = 'get_type_category'
 
         try:

@@ -25,6 +25,21 @@ model_get_category = api.parser().add_argument(
     name='id_categoria',
     type=int,
     help="ID da categoria"
+).add_argument(
+    name='id_tipo_categoria',
+    type=int,
+    help="ID do tipo da categoria"
+)
+model_delete_category = api.parser().add_argument(
+    name='id_categoria',
+    type=int,
+    required=True,
+    help="ID da categoria"
+).add_argument(
+    name='id_tipo_categoria',
+    type=int,
+    required=True,
+    help="ID do tipo da categoria"
 )
 
 # ---------------------------->>
@@ -38,7 +53,8 @@ class ControleiCategoria(Resource):
     def get(self):
         """Obtém uma ou todas as categorias"""
         id_categoria = request.args.get('id_categoria')
-        result = cat_f().obter_categoria(id_categoria)
+        id_tipo_categoria = request.args.get('id_tipo_categoria')
+        result = cat_f().obter_categoria(id_categoria, id_tipo_categoria)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -65,6 +81,20 @@ class ControleiCategoria(Resource):
         parm_dict = request.get_json()
 
         cat_f().atualizar_categoria(parm_dict)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS,
+                MSG_SUCESSO,
+                None)
+        )
+
+    @api.expect(model_delete_category, validate=True)
+    def delete(self):
+        """Deleta uma categoria existente"""
+        id_categoria = request.args.get('id_categoria')
+        id_tipo_categoria = request.args.get('id_tipo_categoria')
+        cat_f().apagar_categoria(id_categoria, id_tipo_categoria)
 
         return jsonify(
             get_dict_retorno_endpoint(

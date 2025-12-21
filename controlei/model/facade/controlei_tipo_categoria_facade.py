@@ -26,6 +26,17 @@ class ControleiTipoCategoriaFacade():
 
         try:
 
+            tipos = self.dao.get_type_category()
+            if tipos:
+                for tipo in tipos:
+                    if tipo['codigo_tipo_categoria'].upper() == parm_dict[
+                            'codigo_tipo_categoria'].upper():
+                        raise FacadeException(
+                            __file__,
+                            rotina,
+                            "Tipo de categoria já existente!"
+                        )
+
             id_categoria = self.dao.insert_type_category(parm_dict)
             self.dao.database_commit()
 
