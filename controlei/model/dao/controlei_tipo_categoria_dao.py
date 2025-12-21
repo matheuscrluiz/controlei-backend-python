@@ -64,11 +64,11 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
                 UPDATE tipo_categoria
                 SET codigo_tipo_categoria        = %(codigo_tipo_categoria)s,
                     dsc_tipo_categoria       = %(dsc_tipo_categoria)s
-                WHERE id_categoria = %(id_categoria)s
+                WHERE id_tipo_categoria = %(id_tipo_categoria)s
             """
 
             params = {
-                "id_categoria": parm_dict['id_categoria'],
+                "id_tipo_categoria": parm_dict['id_tipo_categoria'],
                 "codigo_tipo_categoria": parm_dict['codigo_tipo_categoria'],
                 "dsc_tipo_categoria": parm_dict['dsc_tipo_categoria']
             }
