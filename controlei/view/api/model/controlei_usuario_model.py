@@ -37,10 +37,7 @@ def generate_usuario_model(api: Namespace, type: str) -> Model:
             required=True,
             description="ID do usuário"
         ),
-        'alterado_em': fields.Date(
-            required=True,
-            description="Data da alteração"
-        ),
+
 
     })
     return api.model(name='put_usuario_model', model=model)
