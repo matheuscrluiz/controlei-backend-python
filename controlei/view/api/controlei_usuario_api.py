@@ -26,6 +26,17 @@ model_get_user = api.parser().add_argument(
     type=str,
     help="ch_rede do usuário"
 )
+delete_usuario_model = api.parser().add_argument(
+    name='ch_rede',
+    type=str,
+    help="ch_rede do usuário",
+    required=True
+).add_argument(
+    name='id_usuario',
+    type=int,
+    help="ID do usuário",
+    required=True
+)
 
 # ---------------------------->>
 # Rotas
@@ -73,6 +84,21 @@ class UsuarioCollection(Resource):
                 None)
         )
 
+    @api.expect(delete_usuario_model, validate=True)
+    def delete(self):
+        """Deleta um usuário"""
+        facade = user_f()
+        ch_rede = request.args.get('ch_rede')
+        id_usuario = request.args.get('id_usuario')
+        facade.deletar_usuario(id_usuario, ch_rede)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS,
+                MSG_SUCESSO,
+                None)
+        )
+
 
 @api.route('/<int:id_usuario>')
 class UsuarioDetail(Resource):
@@ -84,16 +110,4 @@ class UsuarioDetail(Resource):
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, usuario)
-        )
-
-    def delete(self, id_usuario):
-        """Deleta um usuário"""
-        facade = user_f()
-        facade.deletar_usuario(id_usuario)
-
-        return jsonify(
-            get_dict_retorno_endpoint(
-                TIP_RETORNO_SUCESS,
-                MSG_SUCESSO,
-                None)
         )

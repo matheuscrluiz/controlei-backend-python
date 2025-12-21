@@ -25,6 +25,7 @@ class ControleiUserFacade():
         rotina = 'criar_usuario'
 
         try:
+            parm_dict['ch_rede'] = parm_dict['ch_rede'].strip().upper()
 
             usuario_existente = self.dao.get_user(ch_rede=parm_dict['ch_rede'])
             if usuario_existente:
@@ -59,7 +60,7 @@ class ControleiUserFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    def deletar_usuario(self, id_usuario: int):
+    def deletar_usuario(self, id_usuario: int, ch_rede: str):
         rotina = 'deletar_usuario'
 
         try:
@@ -67,13 +68,15 @@ class ControleiUserFacade():
                 raise FacadeException(
                     __file__, rotina, 'ID do usuário é obrigatório')
 
+            ch_rede = ch_rede.strip().upper()
+
             # Verificar se usuário existe
             usuario = self.dao.get_user_by_id(id_usuario=id_usuario)
             if not usuario:
                 raise FacadeException(
                     __file__, rotina, 'Usuário não encontrado')
 
-            self.dao.delete_usuario(id_usuario)
+            self.dao.delete_usuario(id_usuario, ch_rede)
             self.dao.database_commit()
 
         except Exception as erro:

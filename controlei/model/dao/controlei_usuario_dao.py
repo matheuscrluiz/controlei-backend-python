@@ -91,8 +91,8 @@ class ControleiUserDAO(base.DAOBase):
                     cpf        = %(cpf)s,
                     nome        = %(nome)s,
                     email       = %(email)s,
-                    senha       = %(senha)s,
-                    alterado_em = NOW()
+                    senha       = %(senha)s
+                  --  alterado_em = NOW()
                 WHERE id_usuario = %(id_usuario)s
             """
 
@@ -111,16 +111,20 @@ class ControleiUserDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def delete_usuario(self, id_usuario: int):
+    def delete_usuario(self, id_usuario: int, ch_rede: str):
         rotina = 'delete_usuario'
 
         try:
             cmdSql = """
                 DELETE FROM usuario
                 WHERE id_usuario = %(id_usuario)s
+                and ch_rede = %(ch_rede)s
             """
 
-            params = {'id_usuario': id_usuario}
+            params = {
+                'id_usuario': id_usuario,
+                'ch_rede': ch_rede
+            }
 
             self.execute_dml_command_parms(cmdSql, params)
 
