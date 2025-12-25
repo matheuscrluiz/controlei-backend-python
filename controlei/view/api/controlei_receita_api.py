@@ -31,7 +31,27 @@ model_get_income = api.parser().add_argument(
     type=str,
     help="Chave de rede do usuário",
     required=True
+).add_argument(
+    name='tipoFiltro',
+    type=str,
+    choices=['DIA', 'MES', 'ANO'],
+    required=True,
+    help='Tipo de filtro'
+) .add_argument(
+    name='dataDia',
+    type=str,
+).add_argument(
+    name='mesInicial',
+    type=str,
+).add_argument(
+    name='mesFinal',
+    type=str,
+).add_argument(
+    name='ano',
+    type=str,
 )
+
+
 model_delete_income = api.parser().add_argument(
     name='id_receita',
     type=int,
@@ -56,8 +76,15 @@ class ControleiMeioPagamento(Resource):
         """Obtém uma ou todas as receitas do usuário"""
         id_receita = request.args.get('id_receita')
         ch_rede = request.args.get('ch_rede')
+        tipo_filtro = request.args.get('tipoFiltro')
+        mes_inicial = request.args.get('mesInicial')
+        mes_final = request.args.get('mesFinal')
+        ano = request.args.get('ano')
+        data_dia = request.args.get('dataDia')
         result = rec_f().obter_receita(
-            id_receita, ch_rede)
+            id_receita, ch_rede,
+            tipo_filtro, mes_inicial,
+            mes_final, ano, data_dia)
 
         return jsonify(
             get_dict_retorno_endpoint(
