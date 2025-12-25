@@ -11,15 +11,21 @@ class ControleiReceitaDAO(base.DAOBase):
     def get_income(
             self,
             id_receita: int = None,
-            ch_rede: str = None) -> dict:
+            ch_rede: str = None,
+            tipo_filtro: str = None,
+            mes_inicial: str = None,
+            mes_final: str = None,
+            ano: str = None,
+            data_dia: str = None
+    ) -> dict:
         rotina = 'get_income'
 
         try:
-
             query = """
                 SELECT
                     r.id_receita,
                     r.id_categoria,
+                    c.dsc_categoria,
                     u.nome,
                     u.ch_rede,
                     r.dsc_receita,
@@ -30,6 +36,8 @@ class ControleiReceitaDAO(base.DAOBase):
                 FROM receita r
                 join usuario u
                     on r.ch_rede = u.ch_rede
+                join categoria c
+                    on r.id_categoria = c.id_categoria
                 where r.ch_rede = %(ch_rede)s
             """
 
@@ -39,6 +47,28 @@ class ControleiReceitaDAO(base.DAOBase):
                 query += " and id_receita = %(id_receita)s"
                 params_oracle['id_receita'] = id_receita
 
+            if tipo_filtro == "MES" and mes_inicial and mes_final:
+                query += """
+                    AND TO_CHAR(
+                    r.data_recebimento, 'MM/YYYY') >= %(mes_inicial)s
+                    AND TO_CHAR(
+                    r.data_recebimento, 'MM/YYYY') <= %(mes_final)s
+                """
+                params_oracle["mes_inicial"] = mes_inicial
+                params_oracle["mes_final"] = mes_final
+
+            elif tipo_filtro == "ANO" and ano:
+                query += """
+                    AND TO_CHAR(r.data_recebimento, 'YYYY') = %(ano)s
+                """
+                params_oracle["ano"] = ano
+
+            elif tipo_filtro == "DIA" and data_dia:
+                query += """ AND TO_CHAR(
+                r.data_recebimento, 'DD/MM/YYYY') = %(data_dia)s"""
+                params_oracle["data_dia"] = data_dia
+
+            print('query: ', query)
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params_oracle)
 
@@ -54,7 +84,7 @@ class ControleiReceitaDAO(base.DAOBase):
             cmdSql = """
                 INSERT INTO receita (
                     id_categoria,
-                    id_usuario,
+                    ch_rede,
                     dsc_receita,
                     valor,
                     data_recebimento,
@@ -63,7 +93,7 @@ class ControleiReceitaDAO(base.DAOBase):
                 )
                 VALUES (
                     %(id_categoria)s,
-                    %(id_usuario)s,
+                    %(ch_rede)s,
                     %(dsc_receita)s,
                     %(valor)s,
                     %(data_recebimento)s,
@@ -75,7 +105,7 @@ class ControleiReceitaDAO(base.DAOBase):
 
             parms = {
                 "id_categoria": parm_dict.get("id_categoria"),
-                "id_usuario": parm_dict.get("id_usuario"),
+                "ch_rede": parm_dict.get("ch_rede"),
                 "dsc_receita": parm_dict.get("dsc_receita"),
                 "valor": parm_dict.get("valor"),
                 "data_recebimento": parm_dict.get("data_recebimento"),
@@ -97,7 +127,7 @@ class ControleiReceitaDAO(base.DAOBase):
                 UPDATE receita
                 SET
                     id_categoria        = %(id_categoria)s,
-                    id_usuario          = %(id_usuario)s,
+                    ch_rede             = %(ch_rede)s,
                     dsc_receita         = %(dsc_receita)s,
                     valor               = %(valor)s,
                     data_recebimento    = %(data_recebimento)s,
@@ -109,7 +139,7 @@ class ControleiReceitaDAO(base.DAOBase):
             params = {
                 "id_receita": parm_dict["id_receita"],
                 "id_categoria": parm_dict["id_categoria"],
-                "id_usuario": parm_dict["id_usuario"],
+                "ch_rede": parm_dict["ch_rede"],
                 "dsc_receita": parm_dict.get("dsc_receita"),
                 "valor": parm_dict["valor"],
                 "data_recebimento": parm_dict["data_recebimento"],
@@ -125,7 +155,7 @@ class ControleiReceitaDAO(base.DAOBase):
     def delete_income(
             self,
             id_receita: int,
-            id_usuario: int
+            ch_rede: str
     ):
         rotina = 'delete_income'
 
@@ -133,12 +163,12 @@ class ControleiReceitaDAO(base.DAOBase):
             cmdSql = """
                 DELETE FROM receita
                 WHERE id_receita = %(id_receita)s
-                and id_usuario = %(id_usuario)s
+                and ch_rede = %(ch_rede)s
             """
 
             params = {
                 'id_receita': id_receita,
-                'id_usuario': id_usuario
+                'ch_rede': ch_rede
             }
 
             self.execute_dml_command_parms(cmdSql, params)
