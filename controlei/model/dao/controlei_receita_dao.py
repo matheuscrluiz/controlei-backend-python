@@ -68,7 +68,7 @@ class ControleiReceitaDAO(base.DAOBase):
                 r.data_recebimento, 'DD/MM/YYYY') = %(data_dia)s"""
                 params_oracle["data_dia"] = data_dia
 
-            print('query: ', query)
+            query += " order by r.data_recebimento asc"
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params_oracle)
 
