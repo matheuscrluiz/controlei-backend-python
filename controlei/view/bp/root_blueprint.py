@@ -11,6 +11,7 @@ from ..api.controlei_categoria_api import api as controlei_categoria_api
 from ..api.controlei_meio_pagamento_api import (
     api as controlei_meio_pagamento_api)
 from ..api.controlei_receita_api import api as controlei_receita_api
+from ..api.controlei_despesa_api import api as controlei_despesa_api
 from ..api.controlei_tipo_categoria_api import (
     api as controlei_tipo_categoria_api)
 from ..api.login_api import api as login_api
@@ -66,6 +67,7 @@ api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
 api.add_namespace(controlei_meio_pagamento_api)
 api.add_namespace(controlei_receita_api)
+api.add_namespace(controlei_despesa_api)
 api.add_namespace(controlei_tipo_categoria_api)
 api.add_namespace(login_api)
 # ---------------------------->>
