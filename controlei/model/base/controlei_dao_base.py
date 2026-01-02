@@ -66,6 +66,10 @@ class DAOBase:
                     lambda x: x.isoformat() if x is not None else None
                 )
             else:
+                # 🔧 ADD: força float para object (mantém resto igual)
+                if pd.api.types.is_float_dtype(df[col]):
+                    df[col] = df[col].astype(object)
+
                 # outras colunas
                 df[col] = df[col].where(pd.notnull(df[col]), None)
 

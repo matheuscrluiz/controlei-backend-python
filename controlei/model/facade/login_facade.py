@@ -34,7 +34,7 @@ class LoginFacade():
                 raise FacadeException(
                     __file__, rotina, 'senha é obrigatória')
 
-            ch_rede = ch_rede.strip()
+            ch_rede = ch_rede.strip().upper()
 
             # Autenticar usuário
             user = self.dao.authenticate_user(ch_rede, senha)
