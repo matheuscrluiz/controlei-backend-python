@@ -5,3 +5,4 @@ pandas
 Flask-CORS
 psycopg2
 python-dotenv
+gunicorn==21.2.0

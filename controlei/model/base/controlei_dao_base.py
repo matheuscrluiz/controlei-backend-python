@@ -1,4 +1,5 @@
 # coding: utf-8
+import os
 from controlei.util.exceptions import DAOException
 from ...util.constants import (
     DATABASE_HOST,
@@ -17,31 +18,33 @@ load_dotenv()
 class DAOBase:
 
     def __init__(self):
-        """
-        Classe base para DAOs usando PostgreSQL.
-        """
-        self.username = DATABASE_USERNAME
-        self.password = DATABASE_PASSWORD
-        self.host = DATABASE_HOST
-        self.dbname = DATABASE_NAME
-        self.port = getattr(globals(), "DATABASE_PORT", 5432)
+        self.database_url = os.getenv("DATABASE_URL")
 
-    # ----------------------------------------------------------------------
-    # GET CONNECTION
-    # ----------------------------------------------------------------------
+        self.username = os.getenv("DB_USERNAME")
+        self.password = os.getenv("DB_PASSWORD")
+        self.host = os.getenv("DB_HOST")
+        self.dbname = os.getenv("DATABASE_NAME")
+        self.port = os.getenv("DATABASE_PORT", 5432)
+
     def get_connection(self):
-        """
-        Retorna uma conexão ativa com o PostgreSQL.
-        """
         try:
             if not hasattr(self, "connection") or self.connection is None or self.connection.closed != 0:
-                self.connection = psycopg2.connect(
-                    dbname=self.dbname,
-                    user=self.username,
-                    password=self.password,
-                    host=self.host,
-                    port=self.port
-                )
+                if self.database_url:
+                    # PRODUÇÃO (Render + Neon)
+                    self.connection = psycopg2.connect(
+                        self.database_url,
+                        sslmode="require"
+                    )
+                else:
+                    # LOCAL / LEGADO
+                    self.connection = psycopg2.connect(
+                        dbname=self.dbname,
+                        user=self.username,
+                        password=self.password,
+                        host=self.host,
+                        port=self.port
+                    )
+
             return self.connection
         except Exception as err:
             raise Exception(f"Erro ao conectar ao PostgreSQL: {err}")
