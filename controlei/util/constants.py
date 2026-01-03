@@ -15,7 +15,9 @@ DATABASE_USERNAME = os.environ.get("DB_USERNAME")
 DATABASE_PASSWORD = os.environ.get("DB_PASSWORD")
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 DATABASE_PORT = os.environ.get("DATABASE_PORT")
-if not DATABASE_URL:
+if DATABASE_URL:
+    pass
+else:
     REQUIRED_ENV_VARS = {
         'FLASK_ENV': FLASK_ENV,
         'DATABASE_HOST': DATABASE_HOST,
@@ -23,14 +25,14 @@ if not DATABASE_URL:
         'DATABASE_PASSWORD': DATABASE_PASSWORD
     }
 
-for var_env in REQUIRED_ENV_VARS.keys():
-    if REQUIRED_ENV_VARS.get(var_env) is None:
-        raise NotFoundException(f'{var_env} não localizada no ambiente!')
+    for var_env in REQUIRED_ENV_VARS.keys():
+        if REQUIRED_ENV_VARS.get(var_env) is None:
+            raise NotFoundException(f'{var_env} não localizada no ambiente!')
 
-if FLASK_ENV not in ('development', 'testing', 'production'):
-    raise InvalidFieldException(
-        'Ambiente inválido. Inicialização interrompida!'
-    )
+# if FLASK_ENV not in ('development', 'testing', 'production'):
+#     raise InvalidFieldException(
+#         'Ambiente inválido. Inicialização interrompida!'
+#     )
 
 print('FLASK_ENV: ', FLASK_ENV)
 print('DATABASE_HOST: ', DATABASE_HOST)
