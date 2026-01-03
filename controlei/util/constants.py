@@ -9,18 +9,19 @@ from .exceptions import InvalidFieldException, NotFoundException
 FLASK_ENV = os.environ.get("FLASK_ENV")
 
 # Database config
+DATABASE_URL = os.environ.get("DATABASE_URL")
 DATABASE_HOST = os.environ.get("DB_HOST")
 DATABASE_USERNAME = os.environ.get("DB_USERNAME")
 DATABASE_PASSWORD = os.environ.get("DB_PASSWORD")
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 DATABASE_PORT = os.environ.get("DATABASE_PORT")
-
-REQUIRED_ENV_VARS = {
-    'FLASK_ENV': FLASK_ENV,
-    'DATABASE_HOST': DATABASE_HOST,
-    'DATABASE_USERNAME': DATABASE_USERNAME,
-    'DATABASE_PASSWORD': DATABASE_PASSWORD
-}
+if not DATABASE_URL:
+    REQUIRED_ENV_VARS = {
+        'FLASK_ENV': FLASK_ENV,
+        'DATABASE_HOST': DATABASE_HOST,
+        'DATABASE_USERNAME': DATABASE_USERNAME,
+        'DATABASE_PASSWORD': DATABASE_PASSWORD
+    }
 
 for var_env in REQUIRED_ENV_VARS.keys():
     if REQUIRED_ENV_VARS.get(var_env) is None:
