@@ -2,8 +2,8 @@ from flask import jsonify, request
 from flask_restx import Resource
 from flask_restx.namespace import Namespace
 from controlei.util.util import get_dict_retorno_endpoint
-from .model.controlei_investimento_model import (
-    generate_investimento_model)
+from .model.controlei_instituicao_model import (
+    generate_instituicao_model)
 from ...util.constants import MSG_SUCESSO, TIP_RETORNO_SUCESS
 from ...model.facade.controlei_instituicao_facade import (
     ControleiInstituicaoFacade as inst_f
@@ -19,26 +19,21 @@ api = Namespace('controlei-instituicao',
 # ---------------------------->>
 # Model
 # ---------------------------->>
-put_investimento_model = generate_investimento_model(api, "put")
-post_investimento_model = generate_investimento_model(api, "post")
+put_instituicao_model = generate_instituicao_model(api, "put")
+post_instituicao_model = generate_instituicao_model(api, "post")
 
 
-model_get_investiment = api.parser().add_argument(
+model_get_instituicao = api.parser().add_argument(
     name='id_instituicao',
     type=int,
-    help="ID do investimento"
+    help="ID da instituição"
 )
 
 
-model_delete_investiment = api.parser().add_argument(
-    name='id_investimento',
+model_delete_instituicao = api.parser().add_argument(
+    name='id_instituicao',
     type=int,
-    help="ID da investimento",
-    required=True
-).add_argument(
-    name='ch_rede',
-    type=int,
-    help="Chave de rede do usuário",
+    help="ID da instituição",
     required=True
 )
 
@@ -48,10 +43,10 @@ model_delete_investiment = api.parser().add_argument(
 
 
 @api.route('')
-class ControleiMeioPagamento(Resource):
-    @api.expect(model_get_investiment, validate=True)
+class ControleiInstituicao(Resource):
+    @api.expect(model_get_instituicao, validate=True)
     def get(self):
-        """Obtém um ou todos investimentos do usuário"""
+        """Obtém instituições bancárias"""
         id_instituicao = request.args.get('id_instituicao')
 
         result = inst_f().obter_instituicao(
@@ -62,26 +57,26 @@ class ControleiMeioPagamento(Resource):
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
         )
 
-    @api.expect(post_investimento_model, validate=True)
+    @api.expect(post_instituicao_model, validate=True)
     def post(self):
-        """Cria um novo investimento pro usuario"""
+        """Cria uma nova instituticão"""
         parm_dict = request.get_json()
 
-        id_investimento = inv_f().criar_investimento(parm_dict)
+        id_instituicao = inst_f().criar_instituicao(parm_dict)
 
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS,
                 MSG_SUCESSO,
-                {'id_investimento': id_investimento})
+                {'id_instituicao': id_instituicao})
         )
 
-    @api.expect(put_investimento_model, validate=True)
+    @api.expect(put_instituicao_model, validate=True)
     def put(self):
-        """Atualiza um investimento de um usuário"""
+        """Atualiza uma instituição"""
         parm_dict = request.get_json()
 
-        inv_f().atualizar_investimento(parm_dict)
+        inst_f().atualizar_instituicao(parm_dict)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -90,13 +85,12 @@ class ControleiMeioPagamento(Resource):
                 None)
         )
 
-    @api.expect(model_delete_investiment, validate=True)
+    @api.expect(model_delete_instituicao, validate=True)
     def delete(self):
-        """Deleta um investimento de um usuário"""
-        id_investimento = request.args.get('id_investimento')
-        ch_rede = request.args.get('ch_rede')
-        inv_f().apagar_investimento(
-            id_investimento, ch_rede)
+        """Deleta uma instituição"""
+        id_instituicao = request.args.get('id_instituicao')
+        inst_f().apagar_instituicao(
+            id_instituicao)
 
         return jsonify(
             get_dict_retorno_endpoint(

@@ -37,74 +37,44 @@ class ControleiInstituicaoDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def insert_investment(self, parm_dict: dict):
-        rotina = 'insert_investment'
+    def insert_banks(self, parm_dict: dict):
+        rotina = 'insert_banks'
 
         try:
             cmdSql = """
-                INSERT INTO investimento (
-                    id_categoria,
-                    ch_rede,
-                    nome_investimento,
-                    valor_inicial,
-                    data_inicio,
-                    data_fim,
-                    id_instituicao
+                INSERT INTO instituicao (
+                   dsc_instituicao
                 )
                 VALUES (
-                    %(id_categoria)s,
-                    %(ch_rede)s,
-                    %(nome_investimento)s,
-                    %(valor_inicial)s,
-                    %(data_inicio)s,
-                    %(data_fim)s,
-                    %(id_instituicao)s
+                    %(dsc_instituicao)s
                 )
-                RETURNING id_investimento
+                RETURNING id_instituicao
             """
 
             parms = {
-                "id_categoria": parm_dict.get("id_categoria"),
-                "ch_rede": parm_dict.get("ch_rede"),
-                "nome_investimento": parm_dict.get("nome_investimento"),
-                "valor_inicial": parm_dict.get("valor_inicial"),
-                "data_inicio": parm_dict.get("data_inicio"),
-                "data_fim": parm_dict.get("data_fim"),
-                "id_instituicao": parm_dict.get("id_instituicao"),
+                "dsc_instituicao": parm_dict.get("dsc_instituicao")
             }
 
-            id_investimento = self.execute_dml_command_parms(cmdSql, parms)
-            return id_investimento
+            id_instituicao = self.execute_dml_command_parms(cmdSql, parms)
+            return id_instituicao
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def update_investment(self, parm_dict: dict):
-        rotina = 'update_investment'
+    def update_banks(self, parm_dict: dict):
+        rotina = 'update_banks'
 
         try:
             cmdSql = """
-                UPDATE investimento
+                UPDATE instituicao
                 SET
-                    id_categoria        = %(id_categoria)s,
-                    ch_rede             = %(ch_rede)s,
-                    nome_investimento         = %(nome_investimento)s,
-                    valor_inicial               = %(valor_inicial)s,
-                    data_inicio    = %(data_inicio)s,
-                    data_fim  = %(data_fim)s,
-                    instituicao      = %(instituicao)s
-                WHERE id_investimento = %(id_investimento)s
+                    dsc_instituicao        = %(dsc_instituicao)s
+                WHERE id_instituicao = %(id_instituicao)s
             """
 
             params = {
-                "id_investimento": parm_dict["id_investimento"],
-                "id_categoria": parm_dict["id_categoria"],
-                "ch_rede": parm_dict["ch_rede"],
-                "nome_investimento": parm_dict.get("nome_investimento"),
-                "valor_inicial": parm_dict["valor_inicial"],
-                "data_inicio": parm_dict["data_inicio"],
-                "data_fim": parm_dict.get("data_fim"),
-                "instituicao": parm_dict.get("instituicao"),
+                "id_instituicao": parm_dict["id_instituicao"],
+                "dsc_instituicao": parm_dict["dsc_instituicao"]
             }
 
             self.execute_dml_command_parms(cmdSql, params)
@@ -112,23 +82,20 @@ class ControleiInstituicaoDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def delete_investment(
+    def delete_banks(
             self,
-            id_investimento: int,
-            ch_rede: str
+            id_instituicao: int,
     ):
-        rotina = 'delete_investment'
+        rotina = 'delete_banks'
 
         try:
             cmdSql = """
-                DELETE FROM investimento
-                WHERE id_investimento = %(id_investimento)s
-                and ch_rede = %(ch_rede)s
+                DELETE FROM instituicao
+                WHERE id_instituicao = %(id_instituicao)s
             """
 
             params = {
-                'id_investimento': id_investimento,
-                'ch_rede': ch_rede
+                'id_instituicao': id_instituicao,
             }
 
             self.execute_dml_command_parms(cmdSql, params)
