@@ -18,6 +18,8 @@ from ..api.controlei_investimento_api import (
     api as controlei_investimento_api)
 from ..api.controlei_aporte_investimento_api import (
     api as controlei_aporte_investimento_api)
+from ..api.controlei_rendimento_investimento_api import (
+    api as controlei_rendimento_investimento_api)
 from ..api.controlei_instituicao_api import api as controlei_instituicao_api
 from ..api.login_api import api as login_api
 # ---------------------------->>
@@ -76,6 +78,7 @@ api.add_namespace(controlei_despesa_api)
 api.add_namespace(controlei_tipo_categoria_api)
 api.add_namespace(controlei_investimento_api)
 api.add_namespace(controlei_aporte_investimento_api)
+api.add_namespace(controlei_rendimento_investimento_api)
 api.add_namespace(controlei_instituicao_api)
 api.add_namespace(login_api)
 # ---------------------------->>

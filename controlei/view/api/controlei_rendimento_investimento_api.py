@@ -2,33 +2,33 @@ from flask import jsonify, request
 from flask_restx import Resource
 from flask_restx.namespace import Namespace
 from controlei.util.util import get_dict_retorno_endpoint
-from .model.controlei_aporte_investimento_model import (
-    generate_aporte_investimento_model)
+from .model.controlei_rendimento_investimento_model import (
+    generate_rendimento_investimento_model)
 from ...util.constants import MSG_SUCESSO, TIP_RETORNO_SUCESS
-from ...model.facade.controlei_aporte_investimento_facade import (
-    ControleiAporteInvestimentoFacade as aport_f
+from ...model.facade.controlei_rendimento_investimento_facade import (
+    ControleiRendimentoInvestimentoFacade as rend_f
 )
 # ---------------------------->>
 # NameSpace
 # ---------------------------->>
 
-api = Namespace('controlei-aporte-investimento',
-                description='Tabela de aporte de investimentos')
+api = Namespace('controlei-rendimento-investimento',
+                description='Tabela de rendimento de investimentos')
 
 
 # ---------------------------->>
 # Model
 # ---------------------------->>
-put_aporte_investimento_model = generate_aporte_investimento_model(
+put_rendimento_investimento_model = generate_rendimento_investimento_model(
     api, "put")
-post_aporte_investimento_model = generate_aporte_investimento_model(
+post_rendimento_investimento_model = generate_rendimento_investimento_model(
     api, "post")
 
 
-model_get_inject_investiment = api.parser().add_argument(
-    name='id_aporte',
+model_get_yield_investiment = api.parser().add_argument(
+    name='id_rendimento',
     type=int,
-    help="ID do aporte"
+    help="ID do rendimento"
 ).add_argument(
     name='id_investimento',
     type=int,
@@ -41,10 +41,10 @@ model_get_inject_investiment = api.parser().add_argument(
 )
 
 
-model_delete_investiment = api.parser().add_argument(
-    name='id_aporte',
+model_delete_investiment_yield = api.parser().add_argument(
+    name='id_rendimento',
     type=int,
-    help="ID da aporte",
+    help="ID do rendimento",
     required=True
 ).add_argument(
     name='ch_rede',
@@ -60,15 +60,15 @@ model_delete_investiment = api.parser().add_argument(
 
 @api.route('')
 class ControleiMeioPagamento(Resource):
-    @api.expect(model_get_inject_investiment, validate=True)
+    @api.expect(model_get_yield_investiment, validate=True)
     def get(self):
         """Obtém um ou todos aportes do usuário"""
-        id_aporte = request.args.get('id_aporte')
+        id_rendimento = request.args.get('id_rendimento')
         id_investimento = request.args.get('id_investimento')
         ch_rede = request.args.get('ch_rede')
 
-        result = aport_f().obter_aporte_investimento(
-            id_aporte,
+        result = rend_f().obter_rendimento_investimento(
+            id_rendimento,
             id_investimento,
             ch_rede)
 
@@ -77,12 +77,12 @@ class ControleiMeioPagamento(Resource):
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
         )
 
-    @api.expect(post_aporte_investimento_model, validate=True)
+    @api.expect(post_rendimento_investimento_model, validate=True)
     def post(self):
         """Cria um novo aporte de um investimento do usuario"""
         parm_dict = request.get_json()
 
-        id_aporte = aport_f().criar_aporte_investimento(parm_dict)
+        id_aporte = rend_f().criar_rendimento_investimento(parm_dict)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -91,12 +91,12 @@ class ControleiMeioPagamento(Resource):
                 {'id_aporte': id_aporte})
         )
 
-    @api.expect(put_aporte_investimento_model, validate=True)
+    @api.expect(put_rendimento_investimento_model, validate=True)
     def put(self):
         """Atualiza um investimento de um usuário"""
         parm_dict = request.get_json()
 
-        aport_f().atualizar_aporte_investimento(parm_dict)
+        rend_f().atualizar_rendimento_investimento(parm_dict)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -105,13 +105,13 @@ class ControleiMeioPagamento(Resource):
                 None)
         )
 
-    @api.expect(model_delete_investiment, validate=True)
+    @api.expect(model_delete_investiment_yield, validate=True)
     def delete(self):
         """Deleta um investimento de um usuário"""
-        id_aporte = request.args.get('id_aporte')
+        id_rendimento = request.args.get('id_rendimento')
         ch_rede = request.args.get('ch_rede')
-        aport_f().apagar_aporte_investimento(
-            id_aporte, ch_rede)
+        rend_f().apagar_rendimento_investimento(
+            id_rendimento, ch_rede)
 
         return jsonify(
             get_dict_retorno_endpoint(

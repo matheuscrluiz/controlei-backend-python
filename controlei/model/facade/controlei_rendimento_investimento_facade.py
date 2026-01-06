@@ -1,22 +1,22 @@
 from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
-from ..dao.controlei_aporte_investimento_dao import (
-    ControleiAporteInvestimentoDAO)
+from ..dao.controlei_rendimento_investimento_dao import (
+    ControleiRendimentoInvestimentoDAO)
 from ..dao.controlei_investimento_dao import ControleiInvestimentoDAO
 from ..dao.controlei_usuario_dao import ControleiUserDAO
 
 
-class ControleiAporteInvestimentoFacade():
+class ControleiRendimentoInvestimentoFacade():
 
     def __init__(self):
         """construtor da classe ControleiUserFacade"""
-        self.dao = ControleiAporteInvestimentoDAO()
+        self.dao = ControleiRendimentoInvestimentoDAO()
         self.inv_dao = ControleiInvestimentoDAO()
         self.user_dao = ControleiUserDAO()
 
-    def obter_aporte_investimento(
+    def obter_rendimento_investimento(
         self,
-        id_aporte=None,
+        id_rendimento=None,
         id_investimento=None,
         ch_rede=None,
 
@@ -25,8 +25,8 @@ class ControleiAporteInvestimentoFacade():
 
         try:
 
-            investimento = self.dao.get_investment_injection(
-                id_aporte=id_aporte,
+            investimento = self.dao.get_investment_yield(
+                id_rendimento=id_rendimento,
                 id_investimento=id_investimento,
                 ch_rede=ch_rede)
             return convert_unique_dic_to_arrayDict(investimento)
@@ -34,8 +34,8 @@ class ControleiAporteInvestimentoFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    def criar_aporte_investimento(self, parm_dict: dict):
-        rotina = 'criar_aporte_investimento'
+    def criar_rendimento_investimento(self, parm_dict: dict):
+        rotina = 'criar_rendimento_investimento'
 
         try:
             obtem_investimento = \
@@ -59,23 +59,23 @@ class ControleiAporteInvestimentoFacade():
                     "Somente o criador do investimento pode fazer aporte"
                 )
 
-            if parm_dict['valor_aporte'] < 0:
+            if parm_dict['valor_rendimento'] < 0:
                 raise FacadeException(
                     __file__,
                     rotina,
-                    "O valor do aporte não pode ser menor que zero"
+                    "O valor do rendimento não pode ser menor que zero"
                 )
 
-            id_investimento = self.dao.insert_investment_injection(parm_dict)
+            id_rendimento = self.dao.insert_investment_yield(parm_dict)
             self.dao.database_commit()
 
-            return id_investimento
+            return id_rendimento
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    def atualizar_aporte_investimento(self, parm_dict: dict):
-        rotina = 'atualizar_aporte_investimento'
+    def atualizar_rendimento_investimento(self, parm_dict: dict):
+        rotina = 'atualizar_rendimento_investimento'
 
         try:
             if not parm_dict.get('id_investimento'):
@@ -83,46 +83,46 @@ class ControleiAporteInvestimentoFacade():
                     __file__, rotina, 'ID da investimento é obrigatório'
                 )
 
-            aporte = self.dao.get_investment_injection(
-                id_aporte=parm_dict['id_aporte'],
+            rendimento = self.dao.get_investment_yield(
+                id_rendimento=parm_dict['id_rendimento'],
                 ch_rede=parm_dict['ch_rede'])
-            if not aporte:
+            if not rendimento:
                 raise FacadeException(
-                    __file__, rotina, 'aporte não encontrado'
+                    __file__, rotina, 'rendimento não encontrado'
                 )
 
-            if parm_dict['valor_aporte'] < 0:
+            if parm_dict['valor_rendimento'] < 0:
                 raise FacadeException(
                     __file__,
                     rotina,
-                    "O valor do aporte não pode ser menor que zero"
+                    "O valor do rendimento não pode ser menor que zero"
                 )
 
-            self.dao.update_investment_injection(parm_dict)
+            self.dao.update_investment_yield(parm_dict)
             self.dao.database_commit()
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    def apagar_aporte_investimento(
+    def apagar_rendimento_investimento(
             self,
-            id_aporte: int,
+            id_rendimento: int,
             ch_rede: str
     ):
-        rotina = 'apagar_aporte_investimento'
+        rotina = 'apagar_rendimento_investimento'
 
         try:
-            if not id_aporte:
+            if not id_rendimento:
                 raise FacadeException(
                     __file__, rotina, 'ID da investimento é obrigatório'
                 )
 
-            investimento = self.dao.get_investment_injection(
-                id_aporte=id_aporte,
+            investimento = self.dao.get_investment_yield(
+                id_rendimento=id_rendimento,
                 ch_rede=ch_rede)
             if not investimento:
                 raise FacadeException(
-                    __file__, rotina, 'investimento não encontrada'
+                    __file__, rotina, 'rendimento não encontrado'
                 )
 
             usuario = self.user_dao.get_user(
@@ -136,10 +136,10 @@ class ControleiAporteInvestimentoFacade():
                 raise FacadeException(
                     __file__,
                     rotina,
-                    'Você não tem permissão para deletar esta investimento'
+                    'Você não tem permissão para deletar'
                 )
 
-            self.dao.delete_investment_injection(id_aporte)
+            self.dao.delete_investment_yield(id_rendimento)
             self.dao.database_commit()
 
         except Exception as erro:

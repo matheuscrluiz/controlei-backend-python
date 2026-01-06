@@ -3,38 +3,38 @@ from ...util.exceptions import DAOException
 from ..base import controlei_dao_base as base
 
 
-class ControleiAporteInvestimentoDAO(base.DAOBase):
+class ControleiRendimentoInvestimentoDAO(base.DAOBase):
 
     def __init__(self):
         super().__init__()
 
-    def get_investment_injection(
+    def get_investment_yield(
             self,
-            id_aporte: int = None,
+            id_rendimento: int = None,
             id_investimento: int = None,
             ch_rede: str = None,
 
     ) -> dict:
-        rotina = 'get_investment_injection'
+        rotina = 'get_investment_yield'
 
         try:
             query = """
                 SELECT
                     i.id_investimento,
-                    a.id_aporte,
+                    r.id_rendimento,
                     c.id_categoria,
                     c.dsc_categoria,
                     i.nome_investimento,
                     u.ch_rede,
                     i.id_instituicao,
                     i.valor_inicial,
-                    a.valor_aporte,
-                    a.data_aporte,
+                    r.mes_referencia,
+                    r.valor_rendimento,
                     i.data_inicio,
                     i.data_fim
-                FROM investimento_aporte a
+                FROM investimento_rendimento r
                 join investimento i
-                    on a.id_investimento = i.id_investimento
+                    on r.id_investimento = i.id_investimento
                 join usuario u
                     on i.ch_rede = u.ch_rede
                 join categoria c
@@ -44,9 +44,9 @@ class ControleiAporteInvestimentoDAO(base.DAOBase):
 
             params_oracle = {"ch_rede": ch_rede}
 
-            if id_aporte:
-                query += " and a.id_aporte = %(id_aporte)s"
-                params_oracle['id_aporte'] = id_aporte
+            if id_rendimento:
+                query += " and r.id_rendimento = %(id_rendimento)s"
+                params_oracle['id_rendimento'] = id_rendimento
             if id_investimento:
                 query += " and i.id_investimento = %(id_investimento)s"
                 params_oracle['id_investimento'] = id_investimento
@@ -60,52 +60,52 @@ class ControleiAporteInvestimentoDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def insert_investment_injection(self, parm_dict: dict):
-        rotina = 'insert_investment_injection'
+    def insert_investment_yield(self, parm_dict: dict):
+        rotina = 'insert_investment_yield'
 
         try:
             cmdSql = """
-                INSERT INTO investimento_aporte (
+                INSERT INTO investimento_rendimento (
                     id_investimento,
-                    valor_aporte,
-                    data_aporte
+                    mes_referencia,
+                    valor_rendimento
                 )
                 VALUES (
                     %(id_investimento)s,
-                    %(valor_aporte)s,
-                    %(data_aporte)s
+                    %(mes_referencia)s,
+                    %(valor_rendimento)s
                 )
-                RETURNING id_aporte
+                RETURNING id_rendimento
             """
 
             parms = {
                 "id_investimento": parm_dict.get("id_investimento"),
-                "valor_aporte": parm_dict.get("valor_aporte"),
-                "data_aporte": parm_dict.get("data_aporte"),
+                "mes_referencia": parm_dict.get("mes_referencia"),
+                "valor_rendimento": parm_dict.get("valor_rendimento"),
             }
 
-            id_aporte = self.execute_dml_command_parms(cmdSql, parms)
-            return id_aporte
+            id_rendimento = self.execute_dml_command_parms(cmdSql, parms)
+            return id_rendimento
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def update_investment_injection(self, parm_dict: dict):
-        rotina = 'update_investment_injection'
+    def update_investment_yield(self, parm_dict: dict):
+        rotina = 'update_investment_yield'
 
         try:
             cmdSql = """
-                UPDATE investimento_aporte
+                UPDATE investimento_rendimento
                 SET
-                    valor_aporte               = %(valor_aporte)s,
-                    data_aporte    = %(data_aporte)s
-                WHERE id_aporte = %(id_aporte)s
+                    mes_referencia               = %(mes_referencia)s,
+                    valor_rendimento    = %(valor_rendimento)s
+                WHERE id_rendimento = %(id_rendimento)s
             """
 
             params = {
-                "id_aporte": parm_dict["id_aporte"],
-                "valor_aporte": parm_dict["valor_aporte"],
-                "data_aporte": parm_dict["data_aporte"],
+                "id_rendimento": parm_dict["id_rendimento"],
+                "mes_referencia": parm_dict["mes_referencia"],
+                "valor_rendimento": parm_dict["valor_rendimento"],
             }
 
             self.execute_dml_command_parms(cmdSql, params)
@@ -113,20 +113,20 @@ class ControleiAporteInvestimentoDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def delete_investment_injection(
+    def delete_investment_yield(
             self,
-            id_aporte: int,
+            id_rendimento: int,
     ):
-        rotina = 'delete_investment_injection'
+        rotina = 'delete_investment_yield'
 
         try:
             cmdSql = """
-                DELETE FROM investimento_aporte
-                WHERE id_aporte = %(id_aporte)s
+                DELETE FROM investimento_rendimento
+                WHERE id_rendimento = %(id_rendimento)s
             """
 
             params = {
-                'id_aporte': id_aporte,
+                'id_rendimento': id_rendimento,
             }
 
             self.execute_dml_command_parms(cmdSql, params)

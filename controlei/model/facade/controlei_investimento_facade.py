@@ -3,6 +3,8 @@ from ...util.util import convert_unique_dic_to_arrayDict
 from ..dao.controlei_investimento_dao import ControleiInvestimentoDAO
 from ..dao.controlei_categoria_dao import ControleiCategoriaDAO
 from ..dao.controlei_usuario_dao import ControleiUserDAO
+from ..dao.controlei_aporte_investimento_dao import (
+    ControleiAporteInvestimentoDAO)
 
 
 class ControleiInvestimentoFacade():
@@ -12,6 +14,7 @@ class ControleiInvestimentoFacade():
         self.dao = ControleiInvestimentoDAO()
         self.cat_dao = ControleiCategoriaDAO()
         self.user_dao = ControleiUserDAO()
+        self.ap_dao = ControleiAporteInvestimentoDAO()
 
     def obter_investimento(
         self,
@@ -22,7 +25,7 @@ class ControleiInvestimentoFacade():
         rotina = 'obter_investimento'
 
         try:
-
+            ch_rede = ch_rede.upper()
             investimento = self.dao.get_investment(
                 id_investimento=id_investimento,
                 ch_rede=ch_rede)
@@ -148,6 +151,18 @@ class ControleiInvestimentoFacade():
                     'Você não tem permissão para deletar esta investimento'
                 )
 
+            aportes = self.ap_dao.get_investment_injection(
+                id_investimento=id_investimento,
+                ch_rede=ch_rede
+            )
+
+            if aportes:
+                for aporte in aportes:
+                    self.ap_dao.delete_investment_injection(
+                        id_aporte=aporte['id_aporte']
+                    )
+
+            self.ap_dao.database_commit()
             self.dao.delete_investment(id_investimento, ch_rede)
             self.dao.database_commit()
 
