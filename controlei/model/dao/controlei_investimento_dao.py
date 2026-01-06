@@ -31,6 +31,9 @@ class ControleiInvestimentoDAO(base.DAOBase):
                     i.data_inicio,
                     a.valor_aporte,
                     a.data_aporte,
+                    r.id_rendimento,
+                    r.mes_referencia,
+                    r.valor_rendimento,
                     i.data_fim
                 FROM investimento i
                 join usuario u
@@ -39,6 +42,8 @@ class ControleiInvestimentoDAO(base.DAOBase):
                     on i.id_categoria = c.id_categoria
                 left join investimento_aporte a
                     on a.id_investimento = i.id_investimento
+                left join investimento_rendimento r
+                    on r.id_investimento = i.id_investimento
                 left join instituicao inc
                     on inc.id_instituicao = i.id_instituicao
                 where i.ch_rede = %(ch_rede)s
