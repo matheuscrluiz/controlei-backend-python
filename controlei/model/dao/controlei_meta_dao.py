@@ -22,6 +22,7 @@ class ControleiMetaDAO(base.DAOBase):
                     m.prioridade,
                     m.dsc_meta,
                     m.valor_meta,
+                    m.ativa,
                     COALESCE(SUM(mm.valor),0) AS valor_atual,
                     (m.valor_meta - COALESCE(SUM(mm.valor),0)) AS falta
                 FROM meta m
