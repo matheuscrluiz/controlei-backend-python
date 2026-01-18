@@ -36,7 +36,10 @@ class ControleiMetaDAO(base.DAOBase):
                 query += " and m.id_meta = %(id_meta)s"
                 params_oracle['id_meta'] = id_meta
 
-            query += "  GROUP BY m.id_meta"
+            query += """
+              GROUP BY m.id_meta
+              order by m.prioridade
+            """
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params_oracle)
 
@@ -134,6 +137,51 @@ class ControleiMetaDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def shift_prioridades_down(
+        self,
+        ch_rede: str,
+        inicio: int,
+        fim: int
+    ):
+        rotina = 'shift_prioridades_down'
+        try:
+            cmdSql = """
+                UPDATE meta
+                SET prioridade = prioridade + 1
+                WHERE ch_rede = %s
+                AND prioridade >= %s
+                AND prioridade <= %s
+            """
+
+            params = (ch_rede, inicio, fim)
+
+            self.execute_dml_command_parms(cmdSql, params)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def shift_prioridades_up(
+        self,
+        ch_rede: str,
+        inicio: int,
+        fim: int
+    ):
+        rotina = 'shift_prioridades_up'
+        try:
+            cmdSql = """
+                UPDATE meta
+                SET prioridade = prioridade - 1
+                WHERE ch_rede = %s
+                AND prioridade >= %s
+                AND prioridade <= %s
+            """
+            params = (ch_rede, inicio, fim)
+
+            self.execute_dml_command_parms(cmdSql, params)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def get_monthly_balance_report(self, ch_rede: str) -> dict:
         rotina = 'get_monthly_balance_report'
 
@@ -178,7 +226,7 @@ class ControleiMetaDAO(base.DAOBase):
                 (s.saldo - COALESCE(a.aportado, 0)) AS disponivel
             FROM saldo_mensal s
             LEFT JOIN aporte_mensal a ON a.mes = s.mes
-            ORDER BY s.mes;
+            ORDER BY s.mes desc;
             """
 
             params_oracle = {"ch_rede": ch_rede}

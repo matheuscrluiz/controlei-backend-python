@@ -76,6 +76,17 @@ class ControleiMetaFacade():
                     "O valor da meta não pode ser menor que zero"
                 )
 
+            prioridade_antiga = meta[0]['prioridade']
+            prioridade_nova = parm_dict['prioridade']
+
+            if prioridade_antiga != prioridade_nova:
+                self.reordenar_prioridades(
+                    parm_dict['ch_rede'],
+                    parm_dict['id_meta'],
+                    prioridade_antiga,
+                    prioridade_nova
+                )
+
             self.dao.update_goals(parm_dict)
             self.dao.database_commit()
 
@@ -120,6 +131,31 @@ class ControleiMetaFacade():
             self.dao.delete_goals(id_meta, ch_rede)
             self.dao.database_commit()
 
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def reordenar_prioridades(
+        self,
+        ch_rede: str,
+        id_meta: int,
+        prioridade_antiga: int,
+        prioridade_nova: int
+    ):
+        rotina = 'reordenar_prioridades'
+        try:
+            if prioridade_nova < prioridade_antiga:
+                self.dao.shift_prioridades_down(
+                    ch_rede,
+                    prioridade_nova,
+                    prioridade_antiga - 1
+                )
+
+            elif prioridade_nova > prioridade_antiga:
+                self.dao.shift_prioridades_up(
+                    ch_rede,
+                    prioridade_antiga + 1,
+                    prioridade_nova
+                )
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
