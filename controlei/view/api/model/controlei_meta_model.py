@@ -20,7 +20,7 @@ def generate_meta_model(api: Namespace, type: str) -> Model:
             description="Prioridade da meta"
         ),
         'ativa': fields.String(
-            required=False,
+            # required=False,
             description="Se meta está ativa"
         ),
     }
