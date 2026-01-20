@@ -1,0 +1,8 @@
+flask
+flask-restx==0.5.1
+Werkzeug==2.1.2
+pandas
+Flask-CORS
+psycopg2
+python-dotenv
+gunicorn==21.2.0
