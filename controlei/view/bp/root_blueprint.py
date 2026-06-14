@@ -8,7 +8,7 @@ from ...util.constants import BLUE_PRINT_BASE_URL
 from ..api.area_api import api as area_api
 from ..api.controlei_usuario_api import api as controlei_usuario_api
 from ..api.controlei_categoria_api import api as controlei_categoria_api
-from ..api.controlei_meio_pagamento_api import (
+from ..api.controlei_conta_api import (
     api as controlei_meio_pagamento_api)
 from ..api.controlei_receita_api import api as controlei_receita_api
 from ..api.controlei_despesa_api import api as controlei_despesa_api
