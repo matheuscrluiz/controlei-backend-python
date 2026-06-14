@@ -92,7 +92,7 @@ class ControleiCompraDAO(base.DAOBase):
         rotina = 'update_compra'
 
         try:
-            # Edição:descrição e categoria. Valor/nº de parcelas não mudam
+            # Edição: descrição e categoria. Valor/nº de parcelas não mudam
             # aqui — alterar isso exigiria regerar as parcelas.
             cmdSql = """
                 UPDATE compra
@@ -161,9 +161,12 @@ class ControleiCompraDAO(base.DAOBase):
                     p.*,
                     c.dsc_compra,
                     c.data_compra,
-                    c.num_parcelas
+                    c.num_parcelas,
+                    f.status AS status_fatura,
+                    f.id_cartao
                 FROM parcela p
                 JOIN compra c ON c.id_compra = p.id_compra
+                JOIN fatura f ON f.id_fatura = p.id_fatura
                 where 1=1
             """
 
@@ -209,6 +212,22 @@ class ControleiCompraDAO(base.DAOBase):
 
             id_parcela = self.execute_dml_command_parms(cmdSql, params)
             return id_parcela
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def delete_parcela(self, id_parcela: int):
+        rotina = 'delete_parcela'
+
+        try:
+            cmdSql = """
+                DELETE FROM parcela
+                WHERE id_parcela = %(id_parcela)s
+            """
+
+            params = {'id_parcela': id_parcela}
+
+            self.execute_dml_command_parms(cmdSql, params)
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)

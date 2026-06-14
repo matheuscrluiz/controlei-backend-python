@@ -5,6 +5,7 @@ from ...util.util import convert_unique_dic_to_arrayDict
 from ..dao.controlei_compra_dao import ControleiCompraDAO
 from ..dao.controlei_cartao_dao import ControleiCartaoDAO
 from .controlei_fatura_facade import ControleiFaturaFacade
+from .controlei_fatura_item_facade import ControleiFaturaItemFacade
 
 
 def _normalizar_data(valor) -> date:
@@ -54,6 +55,7 @@ class ControleiCompraFacade():
         self.dao = ControleiCompraDAO()
         self.cartao_dao = ControleiCartaoDAO()
         self.fatura_facade = ControleiFaturaFacade()
+        self.item_facade = ControleiFaturaItemFacade()
 
     def obter_compra(self, id_compra=None, id_cartao=None,
                      id_usuario=None, com_parcelas=False) -> dict:
@@ -173,6 +175,65 @@ class ControleiCompraFacade():
                     __file__, rotina, 'Compra não encontrada')
 
             self.dao.update_compra(parm_dict)
+            self.dao.database_commit()
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def cancelar_compra(self, id_compra: int):
+        """
+        Cancela a compra: as parcelas NÃO pagas são removidas das faturas; as
+        já pagas viram crédito (estorno) na fatura atual do cartão. A compra
+        é marcada como cancelada.
+        """
+        rotina = 'cancelar_compra'
+
+        try:
+            if not id_compra:
+                raise FacadeException(
+                    __file__, rotina, 'ID da compra é obrigatório')
+
+            compra = self.dao.get_compra(id_compra=id_compra)
+            if not compra:
+                raise FacadeException(
+                    __file__, rotina, 'Compra não encontrada')
+            compra = compra[0]
+
+            if compra.get('cancelada'):
+                raise FacadeException(
+                    __file__, rotina, 'Compra já está cancelada')
+
+            id_cartao = compra['id_cartao']
+            parcelas = self.dao.get_parcelas(id_compra=id_compra)
+
+            # A fatura que recebe os créditos é a fatura atual do cartão.
+            # Criada sob demanda só se houver parcela paga.
+            fatura_credito = None
+
+            for parcela in parcelas:
+                status = (parcela.get('status_fatura') or '').strip().lower()
+
+                if status == 'paga':
+                    if fatura_credito is None:
+                        cartao = self.cartao_dao.get_cartao(
+                            id_cartao=id_cartao)[0]
+                        competencia = _competencia_base(
+                            date.today(), int(cartao.get('dia_fechamento')))
+                        fatura_credito = self.fatura_facade.\
+                            obter_ou_criar_fatura(id_cartao, competencia)
+
+                    self.item_facade.criar_fatura_item({
+                        'id_fatura': fatura_credito['id_fatura'],
+                        'tipo': 'estorno',
+                        'valor': parcela['valor_parcela'],
+                        'descricao': 'Estorno: %s' % compra.get('dsc_compra'),
+                        'id_compra': id_compra,
+                    })
+                else:
+                    # Parcela não paga: some da fatura.
+                    self.dao.delete_parcela(parcela['id_parcela'])
+
+            self.dao.marcar_cancelada(id_compra)
             self.dao.database_commit()
 
         except Exception as erro:

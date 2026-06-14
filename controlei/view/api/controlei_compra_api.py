@@ -56,6 +56,13 @@ model_delete_compra = api.parser().add_argument(
     help="ID da compra"
 )
 
+model_cancelar_compra = api.parser().add_argument(
+    name='id_compra',
+    type=int,
+    required=True,
+    help="ID da compra a cancelar"
+)
+
 # ---------------------------->>
 # Rotas
 # ---------------------------->>
@@ -127,4 +134,17 @@ class ParcelaCollection(Resource):
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
+        )
+
+
+@api.route('/cancelar')
+class CompraCancelar(Resource):
+    @api.expect(model_cancelar_compra, validate=True)
+    def post(self):
+        """Cancela a compra: remove parcelas não pagas e credita as pagas"""
+        compra_f().cancelar_compra(request.args.get('id_compra'))
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, None)
         )
