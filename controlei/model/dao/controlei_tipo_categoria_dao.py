@@ -12,20 +12,19 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
         rotina = 'get_type_category'
 
         try:
-
             query = """
                 select * from tipo_categoria
                 where 1=1
             """
 
-            params_oracle = {}
+            params = {}
 
             if id_tipo_categoria:
                 query += " and id_tipo_categoria = %(id_tipo_categoria)s"
-                params_oracle['id_tipo_categoria'] = id_tipo_categoria
+                params['id_tipo_categoria'] = id_tipo_categoria
 
             dataframe = pd.read_sql(
-                sql=query, con=self.get_connection(), params=params_oracle)
+                sql=query, con=self.get_connection(), params=params)
 
             return self.convert_dataframe_to_dict(dataframe)
 
@@ -36,21 +35,17 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
         rotina = 'insert_type_category'
 
         try:
-
             cmdSql = """
-                INSERT INTO tipo_categoria (dsc_tipo_categoria,
-                codigo_tipo_categoria)
-                VALUES (%(dsc_tipo_categoria)s, %(codigo_tipo_categoria)s)
+                INSERT INTO tipo_categoria (dsc_tipo_categoria)
+                VALUES (%(dsc_tipo_categoria)s)
                 returning id_tipo_categoria
             """
 
-            parms_oracle = {
-                "codigo_tipo_categoria": parm_dict["codigo_tipo_categoria"],
+            params = {
                 "dsc_tipo_categoria": parm_dict["dsc_tipo_categoria"]
             }
 
-            id_tipo_categoria = self.execute_dml_command_parms(
-                cmdSql, parms_oracle)
+            id_tipo_categoria = self.execute_dml_command_parms(cmdSql, params)
             return id_tipo_categoria
 
         except DAOException as erro:
@@ -62,14 +57,12 @@ class ControleiTipoCategoriaDAO(base.DAOBase):
         try:
             cmdSql = """
                 UPDATE tipo_categoria
-                SET codigo_tipo_categoria        = %(codigo_tipo_categoria)s,
-                    dsc_tipo_categoria       = %(dsc_tipo_categoria)s
+                SET dsc_tipo_categoria = %(dsc_tipo_categoria)s
                 WHERE id_tipo_categoria = %(id_tipo_categoria)s
             """
 
             params = {
                 "id_tipo_categoria": parm_dict['id_tipo_categoria'],
-                "codigo_tipo_categoria": parm_dict['codigo_tipo_categoria'],
                 "dsc_tipo_categoria": parm_dict['dsc_tipo_categoria']
             }
 

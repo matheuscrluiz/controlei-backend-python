@@ -1,27 +1,25 @@
-from flask_restx import Model, fields, Namespace
+from flask_restx import fields
 
 
-def generate_categoria_model(api: Namespace, type: str) -> Model:
-    model = {
+def generate_categoria_model(api, method):
+    """
+    Model Flask-RESTX da categoria.
+      - post: id_usuario + dsc_categoria + id_tipo_categoria obrigatórios.
+      - put : id_categoria + dsc_categoria + id_tipo_categoria obrigatórios.
+    """
+    campos = {
         'dsc_categoria': fields.String(
-            required=True,
-            description="Dsc. do categoria"
-        ),
+            required=True, description='Descrição da categoria'),
         'id_tipo_categoria': fields.Integer(
-            required=True,
-            description="ID do tipo de categoria"
-        ),
-
+            required=True, description='Tipo da categoria (receita/despesa)'),
     }
 
-    if type == 'post':
-        return api.model(name='post_categoria_model', model=model)
+    if method == 'post':
+        campos['id_usuario'] = fields.Integer(
+            required=True, description='ID do usuário dono da categoria')
 
-    model.update({
-        'id_categoria': fields.Integer(
-            required=True,
-            description="ID do categoria"
-        ),
+    if method == 'put':
+        campos['id_categoria'] = fields.Integer(
+            required=True, description='ID da categoria')
 
-    })
-    return api.model(name='put_categoria_model', model=model)
+    return api.model(f'Categoria_{method}', campos)
