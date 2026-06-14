@@ -11,7 +11,7 @@ class ControleiInstituicaoDAO(base.DAOBase):
     def get_bank(
             self,
             id_instituicao: int = None,
-
+            id_usuario: int = None,
     ) -> dict:
         rotina = 'get_bank'
 
@@ -28,6 +28,12 @@ class ControleiInstituicaoDAO(base.DAOBase):
             if id_instituicao:
                 query += " and i.id_instituicao = %(id_instituicao)s"
                 params_oracle['id_instituicao'] = id_instituicao
+            # compartilhadas (id_usuario nulo) + as do usuário.
+            if id_usuario:
+                query += (
+                    """and (i.id_usuario is null or
+                    i.id_usuario = %(id_usuario)s)""")
+                params_oracle['id_usuario'] = id_usuario
 
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params_oracle)
@@ -43,16 +49,21 @@ class ControleiInstituicaoDAO(base.DAOBase):
         try:
             cmdSql = """
                 INSERT INTO instituicao (
-                   dsc_instituicao
+                    id_usuario, dsc_instituicao, cor, logo_slug, tipo
                 )
                 VALUES (
-                    %(dsc_instituicao)s
+                    %(id_usuario)s, %(dsc_instituicao)s, %(cor)s,
+                    %(logo_slug)s, %(tipo)s
                 )
                 RETURNING id_instituicao
             """
 
             parms = {
-                "dsc_instituicao": parm_dict.get("dsc_instituicao")
+                "id_usuario": parm_dict.get("id_usuario"),
+                "dsc_instituicao": parm_dict.get("dsc_instituicao"),
+                "cor": parm_dict.get("cor"),
+                "logo_slug": parm_dict.get("logo_slug"),
+                "tipo": parm_dict.get("tipo"),
             }
 
             id_instituicao = self.execute_dml_command_parms(cmdSql, parms)
@@ -68,13 +79,19 @@ class ControleiInstituicaoDAO(base.DAOBase):
             cmdSql = """
                 UPDATE instituicao
                 SET
-                    dsc_instituicao        = %(dsc_instituicao)s
+                    dsc_instituicao = %(dsc_instituicao)s,
+                    cor             = %(cor)s,
+                    logo_slug       = %(logo_slug)s,
+                    tipo            = %(tipo)s
                 WHERE id_instituicao = %(id_instituicao)s
             """
 
             params = {
                 "id_instituicao": parm_dict["id_instituicao"],
-                "dsc_instituicao": parm_dict["dsc_instituicao"]
+                "dsc_instituicao": parm_dict.get("dsc_instituicao"),
+                "cor": parm_dict.get("cor"),
+                "logo_slug": parm_dict.get("logo_slug"),
+                "tipo": parm_dict.get("tipo"),
             }
 
             self.execute_dml_command_parms(cmdSql, params)
