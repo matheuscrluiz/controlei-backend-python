@@ -1,43 +1,25 @@
-from flask_restx import Model, fields, Namespace
+from flask_restx import fields
 
 
-def generate_usuario_model(api: Namespace, type: str) -> Model:
-    model = {
-        'ch_rede': fields.String(
-            required=True,
-            description="Chave de rede do usuário"
-        ),
-        'matricula': fields.String(
-            required=True,
-            description="Matricula do usuário"
-        ),
-        'cpf': fields.String(
-            required=True,
-            description="Cpf do usuário"
-        ),
-        'nome': fields.String(
-            required=True,
-            description="Nome do usuário"
-        ),
-        'senha': fields.String(
-            required=True,
-            description="Senha do usuário"
-        ),
-        'email': fields.String(
-            required=True,
-            description="E-mail do usuário"
-        )
+def generate_usuario_model(api, method):
+    """
+    Gera o model Flask-RESTX do usuário conforme o método.
+      - post: nome, email, senha (todos obrigatórios)
+      - put : id_usuario + nome + email obrigatórios; senha opcional (troca)
+    """
+    campos = {
+        'nome': fields.String(required=True, description='Nome do usuário'),
+        'email': fields.String(required=True, description='E-mail do usuário'),
     }
 
-    if type == 'post':
-        return api.model(name='post_usuario_model', model=model)
+    if method == 'post':
+        campos['senha'] = fields.String(
+            required=True, description='Senha do usuário')
 
-    model.update({
-        'id_usuario': fields.Integer(
-            required=True,
-            description="ID do usuário"
-        ),
+    if method == 'put':
+        campos['id_usuario'] = fields.Integer(
+            required=True, description='ID do usuário')
+        campos['senha'] = fields.String(
+            required=False, description='Nova senha (opcional)')
 
-
-    })
-    return api.model(name='put_usuario_model', model=model)
+    return api.model(f'Usuario_{method}', campos)
