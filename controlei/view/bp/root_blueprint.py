@@ -5,13 +5,13 @@ from controlei.util.custom_http_messages import (
     custom_http_after_request, custom_http_erros)
 
 from ...util.constants import BLUE_PRINT_BASE_URL
-from ..api.area_api import api as area_api
+from ..api.controlei_fatura_api import api as controlei_fatura_api
 from ..api.controlei_usuario_api import api as controlei_usuario_api
 from ..api.controlei_categoria_api import api as controlei_categoria_api
 from ..api.controlei_conta_api import (
     api as controlei_meio_pagamento_api)
 from ..api.controlei_receita_api import api as controlei_receita_api
-from ..api.controlei_despesa_api import api as controlei_despesa_api
+from ..api.controlei_compra_api import api as controlei_compra_api
 from ..api.controlei_tipo_categoria_api import (
     api as controlei_tipo_categoria_api)
 from ..api.controlei_investimento_api import (
@@ -72,12 +72,12 @@ api = Api(bp, version=API_VERSION, base_url=BLUE_PRINT_BASE_URL,
 # ---------------------------->>
 # Registra as namespaces da API
 # ---------------------------->>
-api.add_namespace(area_api)
+api.add_namespace(controlei_fatura_api)
 api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
 api.add_namespace(controlei_meio_pagamento_api)
 api.add_namespace(controlei_receita_api)
-api.add_namespace(controlei_despesa_api)
+api.add_namespace(controlei_compra_api)
 api.add_namespace(controlei_tipo_categoria_api)
 api.add_namespace(controlei_investimento_api)
 api.add_namespace(controlei_aporte_investimento_api)
