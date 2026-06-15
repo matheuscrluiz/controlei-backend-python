@@ -123,9 +123,23 @@ class ControleiFaturaFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
+    def obter_total_fatura(self, id_fatura: int):
+        """Retorna o total a pagar da fatura (parcelas + itens)."""
+        rotina = 'obter_total_fatura'
+
+        try:
+            resultado = self.dao.get_total(id_fatura)
+            if not resultado:
+                return 0
+            return resultado[0].get('valor') or 0
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def atualizar_status_fatura(self, id_fatura: int, status: str):
         """Primitiva de status (aberta/fechada/paga). O 'pagar fatura' completo
-        com a transferência que baixa o saldo — virá no fluxo de pagamento."""
+        — com a transferência que baixa o saldo — 
+        virá no fluxo de pagamento."""
         rotina = 'atualizar_status_fatura'
 
         try:

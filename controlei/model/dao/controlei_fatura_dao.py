@@ -88,6 +88,30 @@ class ControleiFaturaDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def get_total(self, id_fatura: int):
+        """Total a pagar da fatura = parcelas + itens avulsos (encargos somam,
+        créditos abatem). Mesma lógica do relatório, computada no servidor."""
+        rotina = 'get_total'
+
+        try:
+            query = """
+                SELECT
+                    COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                              WHERE p.id_fatura = %(id_fatura)s), 0)
+                  + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
+                              WHERE i.id_fatura = %(id_fatura)s), 0) AS valor
+            """
+
+            params = {'id_fatura': id_fatura}
+
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(), params=params)
+
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def update_status_fatura(self, id_fatura: int, status: str):
         rotina = 'update_status_fatura'
 
