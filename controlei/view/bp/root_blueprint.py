@@ -10,7 +10,7 @@ from ..api.controlei_usuario_api import api as controlei_usuario_api
 from ..api.controlei_categoria_api import api as controlei_categoria_api
 from ..api.controlei_conta_api import (
     api as controlei_meio_pagamento_api)
-from ..api.controlei_receita_api import api as controlei_receita_api
+from ..api.controlei_derivados_api import api as controlei_derivados_api
 from ..api.controlei_compra_api import api as controlei_compra_api
 from ..api.controlei_tipo_categoria_api import (
     api as controlei_tipo_categoria_api)
@@ -18,8 +18,8 @@ from ..api.controlei_investimento_api import (
     api as controlei_investimento_api)
 from ..api.controlei_aporte_investimento_api import (
     api as controlei_aporte_investimento_api)
-from ..api.controlei_rendimento_investimento_api import (
-    api as controlei_rendimento_investimento_api)
+from ..api.controlei_recorrencia_api import (
+    api as controlei_recorrencia_api)
 from ..api.controlei_instituicao_api import api as controlei_instituicao_api
 from ..api.controlei_transferencia_api import (
     api as controlei_transferencia_api)
@@ -76,12 +76,12 @@ api.add_namespace(controlei_fatura_api)
 api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
 api.add_namespace(controlei_meio_pagamento_api)
-api.add_namespace(controlei_receita_api)
+api.add_namespace(controlei_derivados_api)
 api.add_namespace(controlei_compra_api)
 api.add_namespace(controlei_tipo_categoria_api)
 api.add_namespace(controlei_investimento_api)
 api.add_namespace(controlei_aporte_investimento_api)
-api.add_namespace(controlei_rendimento_investimento_api)
+api.add_namespace(controlei_recorrencia_api)
 api.add_namespace(controlei_instituicao_api)
 api.add_namespace(controlei_cofre_api)
 api.add_namespace(controlei_transferencia_api)
