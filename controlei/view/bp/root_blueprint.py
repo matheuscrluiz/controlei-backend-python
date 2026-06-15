@@ -21,8 +21,8 @@ from ..api.controlei_aporte_investimento_api import (
 from ..api.controlei_rendimento_investimento_api import (
     api as controlei_rendimento_investimento_api)
 from ..api.controlei_instituicao_api import api as controlei_instituicao_api
-from ..api.controlei_meta_movimentacao_api import (
-    api as controlei_meta_movimentacao_api)
+from ..api.controlei_transferencia_api import (
+    api as controlei_transferencia_api)
 from ..api.controlei_meta_api import api as controlei_meta_api
 from ..api.login_api import api as login_api
 # ---------------------------->>
@@ -84,7 +84,7 @@ api.add_namespace(controlei_aporte_investimento_api)
 api.add_namespace(controlei_rendimento_investimento_api)
 api.add_namespace(controlei_instituicao_api)
 api.add_namespace(controlei_meta_api)
-api.add_namespace(controlei_meta_movimentacao_api)
+api.add_namespace(controlei_transferencia_api)
 api.add_namespace(login_api)
 # ---------------------------->>
 # Inicializa a aplicação
