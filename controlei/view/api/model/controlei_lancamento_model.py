@@ -1,4 +1,9 @@
 from flask_restx import fields
+from controlei.util.restx_fields import (
+    NullableInteger,
+    NullableFloat,
+    NullableString,
+)
 
 
 def generate_lancamento_model(api, method):
@@ -18,16 +23,16 @@ def generate_lancamento_model(api, method):
                 description='receita | despesa | transferencia | ajuste'),
             'valor': fields.Float(
                 required=True, description='Valor positivo'),
-            'data': fields.String(
+            'data': NullableString(
                 required=False, description='Data (YYYY-MM-DD)'),
-            'descricao': fields.String(
+            'descricao': NullableString(
                 required=False, description='Descrição'),
-            'id_categoria': fields.Integer(
+            'id_categoria': NullableInteger(
                 required=False, description='ID da categoria'),
-            'id_cartao': fields.Integer(
+            'id_cartao': NullableInteger(
                 required=False,
                 description='Cartão de débito usado (etiqueta)'),
-            'status': fields.String(
+            'status': NullableString(
                 required=False, description='efetivado | previsto'),
         })
 
@@ -35,17 +40,17 @@ def generate_lancamento_model(api, method):
         return api.model('Lancamento_put', {
             'id_lancamento': fields.Integer(
                 required=True, description='ID do lançamento'),
-            'natureza': fields.String(
+            'natureza': NullableString(
                 required=False, description='receita | despesa | ...'),
-            'valor': fields.Float(required=False,
-                                  description='Valor positivo'),
-            'data': fields.String(required=False,
-                                  description='Data (YYYY-MM-DD)'),
-            'descricao': fields.String(required=False,
-                                       description='Descrição'),
-            'id_categoria': fields.Integer(
+            'valor': NullableFloat(required=False,
+                                   description='Valor positivo'),
+            'data': NullableString(required=False,
+                                   description='Data (YYYY-MM-DD)'),
+            'descricao': NullableString(required=False,
+                                        description='Descrição'),
+            'id_categoria': NullableInteger(
                 required=False, description='ID da categoria'),
-            'id_cartao': fields.Integer(
+            'id_cartao': NullableInteger(
                 required=False, description='Cartão de débito (etiqueta)'),
         })
 

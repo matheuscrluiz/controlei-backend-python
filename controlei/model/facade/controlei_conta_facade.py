@@ -1,6 +1,8 @@
+from decimal import Decimal
 from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
 from ..dao.controlei_conta_dao import ControleiContaDAO
+from .controlei_lancamento_facade import ControleiLancamentoFacade
 
 
 class ControleiContaFacade():
@@ -8,6 +10,7 @@ class ControleiContaFacade():
     def __init__(self):
         """construtor da classe ControleiContaFacade"""
         self.dao = ControleiContaDAO()
+        self.lancamento_facade = ControleiLancamentoFacade()
 
     def obter_conta(self, id_conta=None, id_usuario=None) -> dict:
         rotina = 'obter_conta'
@@ -43,6 +46,19 @@ class ControleiContaFacade():
 
             id_conta = self.dao.insert_conta(parms)
             self.dao.database_commit()
+
+            # Saldo de abertura (só se diferente de zero).
+            # Mesma regra do onboarding: o saldo inicial não é coluna da
+            # conta, é um lançamento de natureza='ajuste'.
+            saldo = parm_dict.get('saldo_abertura')
+            if saldo is not None and Decimal(str(saldo)) != 0:
+                self.lancamento_facade.criar_lancamento({
+                    'id_conta': id_conta,
+                    'natureza': 'ajuste',
+                    'valor': saldo,
+                    'descricao': 'Saldo de abertura',
+                    'status': 'efetivado',
+                })
 
             return id_conta
 

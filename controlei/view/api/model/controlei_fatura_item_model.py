@@ -1,4 +1,5 @@
 from flask_restx import fields
+from controlei.util.restx_fields import NullableInteger, NullableString
 
 
 def generate_fatura_item_model(api, method):
@@ -18,9 +19,9 @@ def generate_fatura_item_model(api, method):
             'valor': fields.Float(
                 required=True,
                 description='Valor positivo (o sinal vem do tipo)'),
-            'descricao': fields.String(
+            'descricao': NullableString(
                 required=False, description='Descrição do item'),
-            'id_compra': fields.Integer(
+            'id_compra': NullableInteger(
                 required=False, description='Compra relacionada (estorno)'),
         })
 

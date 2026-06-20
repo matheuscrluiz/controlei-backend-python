@@ -1,4 +1,10 @@
 from flask_restx import fields
+from controlei.util.restx_fields import (
+    NullableInteger,
+    NullableFloat,
+    NullableString,
+    NullableNested,
+)
 
 
 def generate_onboarding_model(api):
@@ -8,11 +14,11 @@ def generate_onboarding_model(api):
                                  description='Apelido do cartão'),
         'funcao': fields.String(
             required=True, description='credito | debito | multiplo'),
-        'bandeira': fields.String(required=False),
-        'ultimos4': fields.String(required=False),
-        'limite': fields.Float(required=False),
-        'dia_fechamento': fields.Integer(required=False),
-        'dia_vencimento': fields.Integer(required=False),
+        'bandeira': NullableString(required=False),
+        'ultimos4': NullableString(required=False),
+        'limite': NullableFloat(required=False),
+        'dia_fechamento': NullableInteger(required=False),
+        'dia_vencimento': NullableInteger(required=False),
     })
 
     return api.model('Onboarding_post', {
@@ -20,13 +26,13 @@ def generate_onboarding_model(api):
                                      description='ID do usuário'),
         'apelido': fields.String(
             required=True, description='Apelido da conta'),
-        'id_instituicao': fields.Integer(
+        'id_instituicao': NullableInteger(
             required=False, description='Instituição da conta'),
-        'tipo': fields.String(
+        'tipo': NullableString(
             required=False, description='corrente | poupanca | carteira ...'),
-        'saldo_abertura': fields.Float(
+        'saldo_abertura': NullableFloat(
             required=False,
             description='Saldo inicial (vira lançamento ajuste)'),
-        'cartao': fields.Nested(
+        'cartao': NullableNested(
             cartao, required=False, allow_null=True, skip_none=True),
     })

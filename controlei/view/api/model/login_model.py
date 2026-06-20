@@ -17,4 +17,6 @@ def generate_login_response_model(api):
         'id_usuario': fields.Integer(description='ID do usuário'),
         'nome': fields.String(description='Nome do usuário'),
         'email': fields.String(description='E-mail do usuário'),
+        'onboarded': fields.Boolean(
+            description='Usuário já tem conta (passou pelo onboarding)'),
     })
