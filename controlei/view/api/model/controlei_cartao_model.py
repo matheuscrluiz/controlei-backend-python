@@ -1,4 +1,9 @@
 from flask_restx import fields
+from controlei.util.restx_fields import (
+    NullableInteger,
+    NullableFloat,
+    NullableString,
+)
 
 
 def generate_cartao_model(api, method):
@@ -15,17 +20,17 @@ def generate_cartao_model(api, method):
             required=True, description='Apelido do cartão'),
         'funcao': fields.String(
             required=True, description='credito | debito | multiplo'),
-        'bandeira': fields.String(
+        'bandeira': NullableString(
             required=False, description='Visa, Master, Elo...'),
-        'ultimos4': fields.String(
+        'ultimos4': NullableString(
             required=False, description='Últimos 4 dígitos'),
-        'limite': fields.Float(
+        'limite': NullableFloat(
             required=False, description='Limite (crédito)'),
-        'dia_fechamento': fields.Integer(
+        'dia_fechamento': NullableInteger(
             required=False, description='Dia de fechamento (crédito)'),
-        'dia_vencimento': fields.Integer(
+        'dia_vencimento': NullableInteger(
             required=False, description='Dia de vencimento (crédito)'),
-        'id_cartao_pai': fields.Integer(
+        'id_cartao_pai': NullableInteger(
             required=False, description='Cartão pai (cartão virtual)'),
     }
 

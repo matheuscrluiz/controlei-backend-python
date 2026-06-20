@@ -1,14 +1,18 @@
 from werkzeug.security import check_password_hash
 from ...util.exceptions import FacadeException
 from ..dao.controlei_usuario_dao import ControleiUserDAO
+from ..dao.controlei_conta_dao import ControleiContaDAO
 
 
 class LoginFacade():
 
     def __init__(self):
         """Construtor da classe LoginFacade"""
-        # Reusa o DAO de usuário: buscar credenciais + conferir senha.
+        # Reusa o DAO de usuário: autenticar é
+        #  buscar credenciais + conferir senha.
         self.dao = ControleiUserDAO()
+        # Para resolver o onboarding já no login (usuário tem conta?).
+        self.conta_dao = ControleiContaDAO()
 
     def login(self, email: str, senha: str) -> dict:
         """
@@ -37,7 +41,8 @@ class LoginFacade():
 
             credenciais = self.dao.get_credenciais_by_email(email)
 
-            # Mensagem genérica: não revela se foi o e-mail ou a senha.
+            # Mensagem genérica de propósito:
+            # não revela se foi o e-mail ou a senha.
             if not credenciais:
                 raise FacadeException(
                     __file__, rotina, 'Usuário ou senha inválidos')
@@ -48,11 +53,15 @@ class LoginFacade():
                 raise FacadeException(
                     __file__, rotina, 'Usuário ou senha inválidos')
 
+            # Resolve o onboarding aqui: tem ao menos uma conta?
+            contas = self.conta_dao.get_conta(id_usuario=cred['id_usuario'])
+
             # Devolve só o necessário — o hash nunca sai daqui.
             return {
                 'id_usuario': cred['id_usuario'],
                 'nome': cred['nome'],
-                'email': cred['email']
+                'email': cred['email'],
+                'onboarded': bool(contas)
             }
 
         except Exception as erro:

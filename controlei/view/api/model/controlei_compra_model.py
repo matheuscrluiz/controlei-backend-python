@@ -1,4 +1,9 @@
 from flask_restx import fields
+from controlei.util.restx_fields import (
+    NullableInteger,
+    NullableString,
+    NullableBoolean,
+)
 
 
 def generate_compra_model(api, method):
@@ -16,13 +21,13 @@ def generate_compra_model(api, method):
                 required=True, description='Descrição da compra'),
             'valor_total': fields.Float(
                 required=True, description='Valor total da compra'),
-            'data_compra': fields.String(
+            'data_compra': NullableString(
                 required=False, description='Data da compra (YYYY-MM-DD)'),
-            'num_parcelas': fields.Integer(
+            'num_parcelas': NullableInteger(
                 required=False, description='Nº de parcelas (1 = à vista)'),
-            'id_categoria': fields.Integer(
+            'id_categoria': NullableInteger(
                 required=False, description='ID da categoria'),
-            'pre_existente': fields.Boolean(
+            'pre_existente': NullableBoolean(
                 required=False,
                 description='Compra anterior ao app (onboarding)'),
         })
@@ -31,9 +36,9 @@ def generate_compra_model(api, method):
         return api.model('Compra_put', {
             'id_compra': fields.Integer(
                 required=True, description='ID da compra'),
-            'dsc_compra': fields.String(
+            'dsc_compra': NullableString(
                 required=False, description='Descrição da compra'),
-            'id_categoria': fields.Integer(
+            'id_categoria': NullableInteger(
                 required=False, description='ID da categoria'),
         })
 

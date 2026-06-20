@@ -1,4 +1,5 @@
 from flask_restx import fields
+from controlei.util.restx_fields import NullableInteger, NullableString
 
 
 def generate_instituicao_model(api, method):
@@ -11,17 +12,17 @@ def generate_instituicao_model(api, method):
     campos = {
         'dsc_instituicao': fields.String(
             required=True, description='Nome da instituição'),
-        'cor': fields.String(
+        'cor': NullableString(
             required=False, description='Cor em hex, ex.: #8A05BE'),
-        'logo_slug': fields.String(
+        'logo_slug': NullableString(
             required=False, description='Identificador do logo, ex.: nubank'),
-        'tipo': fields.String(
+        'tipo': NullableString(
             required=False,
             description='banco | fintech | corretora | carteira'),
     }
 
     if method == 'post':
-        campos['id_usuario'] = fields.Integer(
+        campos['id_usuario'] = NullableInteger(
             required=False,
             description='Dono da instituição (nulo = compartilhada)')
 
