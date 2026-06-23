@@ -62,12 +62,12 @@ class ControleiCompraDAO(base.DAOBase):
             cmdSql = """
                 INSERT INTO compra (
                     id_cartao, id_categoria, dsc_compra, valor_total,
-                    data_compra, num_parcelas, pre_existente
+                    data_compra, num_parcelas, pre_existente, id_recorrencia
                 )
                 VALUES (
                     %(id_cartao)s, %(id_categoria)s, %(dsc_compra)s,
                     %(valor_total)s, %(data_compra)s, %(num_parcelas)s,
-                    %(pre_existente)s
+                    %(pre_existente)s, %(id_recorrencia)s
                 )
                 RETURNING id_compra
             """
@@ -80,6 +80,7 @@ class ControleiCompraDAO(base.DAOBase):
                 "data_compra": parm_dict.get("data_compra"),
                 "num_parcelas": parm_dict.get("num_parcelas"),
                 "pre_existente": parm_dict.get("pre_existente") or False,
+                "id_recorrencia": parm_dict.get("id_recorrencia"),
             }
 
             id_compra = self.execute_dml_command_parms(cmdSql, params)
@@ -88,11 +89,35 @@ class ControleiCompraDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def existe_recorrencia_no_mes(self, id_recorrencia: int, data) -> bool:
+        """True se já existe compra (não cancelada) dessa recorrência no mês
+          de `data`."""
+        rotina = 'existe_recorrencia_no_mes'
+
+        try:
+            cmdSql = """
+                SELECT 1 FROM compra
+                 WHERE id_recorrencia = %(id_recorrencia)s
+                   AND cancelada = false
+                   AND date_trunc('month', data_compra)
+                       = date_trunc('month', %(data)s::date)
+                 LIMIT 1
+            """
+            params = {"id_recorrencia": id_recorrencia, "data": data}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            resultado = self.convert_dataframe_to_dict(dataframe)
+            return len(resultado) > 0
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def update_compra(self, parm_dict: dict):
         rotina = 'update_compra'
 
         try:
-            # Edição: descrição e categoria. Valor/nº de parcelas não mudam
+            # Edição leve: descrição e categoria.
+            # Valor/nº de parcelas não mudam
             # aqui — alterar isso exigiria regerar as parcelas.
             cmdSql = """
                 UPDATE compra

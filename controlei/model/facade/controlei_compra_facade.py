@@ -28,7 +28,8 @@ def _add_meses(competencia: date, n: int) -> date:
 
 def _competencia_base(data_compra: date, dia_fechamento: int) -> date:
     """
-    Mês da 1ª parcela. Compra antes do fechamento cai na fatura deste mês;
+    Mês da PRIMEIRA parcela. Compra antes do fechamento
+    cai na fatura deste mês;
     a partir do fechamento (inclusive) rola pro mês seguinte.
     """
     if data_compra.day < dia_fechamento:
@@ -137,6 +138,7 @@ class ControleiCompraFacade():
                 'data_compra': data_compra,
                 'num_parcelas': num_parcelas,
                 'pre_existente': parm_dict.get('pre_existente') or False,
+                'id_recorrencia': parm_dict.get('id_recorrencia'),
             })
 
             # 2) Divide o valor e descobre o mês da 1ª parcela.

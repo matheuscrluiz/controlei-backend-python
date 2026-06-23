@@ -5,6 +5,7 @@ from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
 from ..dao.controlei_recorrencia_dao import ControleiRecorrenciaDAO
 from ..dao.controlei_lancamento_dao import ControleiLancamentoDAO
+from ..dao.controlei_compra_dao import ControleiCompraDAO
 from .controlei_compra_facade import ControleiCompraFacade
 
 NATUREZAS_VALIDAS = ('receita', 'despesa')
@@ -28,6 +29,7 @@ class ControleiRecorrenciaFacade():
     def __init__(self):
         self.dao = ControleiRecorrenciaDAO()
         self.lancamento_dao = ControleiLancamentoDAO()
+        self.compra_dao = ControleiCompraDAO()
         self.compra_facade = ControleiCompraFacade()
 
     def obter_recorrencia(self, **filtros) -> dict:
@@ -137,9 +139,8 @@ class ControleiRecorrenciaFacade():
             recorrência variável entra com valor 0, pra você preencher ao
             confirmar.
           - crédito/cartão -> compra de 1x (cai na fatura do mês).
-        O GATILHO (quando chamar isto) fica a cargo
-          do job/preguiçoso; aqui só a
-        materialização.
+        O GATILHO (quando chamar isto) fica a cargo do
+        job/preguiçoso; aqui só a materialização.
         """
         rotina = 'gerar_ocorrencia'
 
@@ -165,6 +166,10 @@ class ControleiRecorrenciaFacade():
                     raise FacadeException(
                         __file__, rotina,
                         'Recorrência de crédito sem valor não pode ser gerada')
+                # idempotência: já existe compra dessa recorrência no mês?
+                if self.compra_dao.existe_recorrencia_no_mes(
+                        id_recorrencia, data_ocorrencia):
+                    return {'gerado': False, 'motivo': 'ja_existe'}
                 return self.compra_facade.criar_compra({
                     'id_cartao': rec['id_cartao'],
                     'id_categoria': rec.get('id_categoria'),
@@ -172,9 +177,19 @@ class ControleiRecorrenciaFacade():
                     'valor_total': rec['valor'],
                     'data_compra': data_ocorrencia,
                     'num_parcelas': 1,
+                    'id_recorrencia': id_recorrencia,
                 })
 
             # --------- DÉBITO/CONTA: lançamento previsto ---------
+            # idempotência: já existe lançamento dessa recorrência no mês?
+            existentes = self.lancamento_dao.get_lancamento(
+                id_recorrencia=id_recorrencia)
+            for e in existentes:
+                d = _normalizar_data(e['data'])
+                if (d.year == data_ocorrencia.year
+                        and d.month == data_ocorrencia.month):
+                    return {'gerado': False, 'motivo': 'ja_existe'}
+
             valor_base = rec.get('valor')
             if rec.get('variavel') or valor_base is None:
                 valor_assinado = 0

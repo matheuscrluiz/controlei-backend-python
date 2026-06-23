@@ -160,6 +160,23 @@ class ControleiLancamentoDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def update_valor_lancamento(self, id_lancamento: int, valor):
+        rotina = 'update_valor_lancamento'
+
+        try:
+            cmdSql = """
+                UPDATE lancamento
+                SET valor = %(valor)s
+                WHERE id_lancamento = %(id_lancamento)s
+            """
+
+            params = {"id_lancamento": id_lancamento, "valor": valor}
+
+            self.execute_dml_command_parms(cmdSql, params)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def delete_lancamento(self, id_lancamento: int):
         rotina = 'delete_lancamento'
 

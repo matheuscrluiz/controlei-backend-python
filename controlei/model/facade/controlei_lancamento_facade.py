@@ -62,7 +62,8 @@ class ControleiLancamentoFacade():
                     'ajuste)')
             if valor is None or Decimal(str(valor)) == 0:
                 raise FacadeException(
-                    __file__, rotina, 'Valor é obrigatório')
+                    __file__, rotina,
+                    'Valor é obrigatório e diferente de zero')
 
             parms = {
                 'id_conta': id_conta,
@@ -121,14 +122,25 @@ class ControleiLancamentoFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    def confirmar_lancamento(self, id_lancamento: int):
-        """Confirma um lançamento 'previsto' (gerado por recorrência)."""
+    def confirmar_lancamento(self, id_lancamento: int, valor=None):
+        """Confirma um lançamento 'previsto'. Se `valor` vier (recorrência
+        variável), atualiza o valor (com sinal pela natureza)
+          antes de efetivar."""
         rotina = 'confirmar_lancamento'
 
         try:
             if not id_lancamento:
                 raise FacadeException(
                     __file__, rotina, 'ID do lançamento é obrigatório')
+
+            if valor is not None:
+                atual = self.dao.get_lancamento(id_lancamento=id_lancamento)
+                if not atual:
+                    raise FacadeException(
+                        __file__, rotina, 'Lançamento não encontrado')
+                natureza = atual[0]['natureza']
+                self.dao.update_valor_lancamento(
+                    id_lancamento, _aplicar_sinal(natureza, valor))
 
             self.dao.update_status_lancamento(id_lancamento, 'efetivado')
             self.dao.database_commit()
