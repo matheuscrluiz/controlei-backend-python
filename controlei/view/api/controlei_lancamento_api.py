@@ -41,6 +41,9 @@ model_get_lancamento = api.parser().add_argument(
 
 model_confirmar_lancamento = api.parser().add_argument(
     name='id_lancamento', type=int, required=True, help="ID do lançamento"
+).add_argument(
+    name='valor', type=float, required=False,
+    help="Valor informado ao confirmar (recorrência variável)"
 )
 
 model_delete_lancamento = api.parser().add_argument(
@@ -112,7 +115,9 @@ class LancamentoConfirmar(Resource):
     @api.expect(model_confirmar_lancamento, validate=True)
     def post(self):
         """Confirma um lançamento previsto (gerado por recorrência)"""
-        lanc_f().confirmar_lancamento(request.args.get('id_lancamento'))
+        lanc_f().confirmar_lancamento(
+            request.args.get('id_lancamento'),
+            request.args.get('valor'))
 
         return jsonify(
             get_dict_retorno_endpoint(
