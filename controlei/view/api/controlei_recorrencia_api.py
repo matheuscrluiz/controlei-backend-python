@@ -1,4 +1,5 @@
 from flask import jsonify, request
+import os
 from flask_restx import Resource
 from flask_restx.namespace import Namespace
 from controlei.util.util import get_dict_retorno_endpoint
@@ -40,6 +41,11 @@ model_gerar = api.parser().add_argument(
     name='id_recorrencia', type=int, required=True, help="ID da recorrência"
 ).add_argument(
     name='data', type=str, help="Data da ocorrência (YYYY-MM-DD)"
+)
+
+model_gerar_todas = api.parser().add_argument(
+    name='X-Cron-Secret', location='headers', required=True,
+    help="Segredo do cron "
 )
 
 # ---------------------------->>
@@ -106,4 +112,24 @@ class RecorrenciaGerar(Resource):
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, {'gerado': resultado})
+        )
+
+
+@api.route('/gerar-todas')
+class RecorrenciaGerarTodas(Resource):
+    @api.expect(model_gerar_todas)
+    def post(self):
+        """Gera o mês para TODAS as recorrências ativas (uso do cron).
+        Protegido por header """
+        segredo = os.environ.get('CRON_SECRET')
+        enviado = request.headers.get('X-Cron-Secret')
+
+        if not segredo or enviado != segredo:
+            return {'erro': 'Não autorizado'}, 401
+
+        resultado = rec_f().gerar_mes_todos()
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
         )
