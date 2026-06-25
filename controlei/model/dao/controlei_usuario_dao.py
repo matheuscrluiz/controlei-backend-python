@@ -8,40 +8,50 @@ class ControleiUserDAO(base.DAOBase):
     def __init__(self):
         super().__init__()
 
-    def get_user(self, ch_rede: str = None) -> dict:
+    # ------------------------------------------------------------------
+    # Leitura "segura": NUNCA devolve senha_hash. Filtros opcionais.
+    # ------------------------------------------------------------------
+    def get_user(self, id_usuario: int = None, email: str = None) -> dict:
         rotina = 'get_user'
 
         try:
-
             query = """
-                select * from usuario
+                select id_usuario, nome, email, criado_em
+                from usuario
                 where 1=1
             """
 
-            params_oracle = {}
+            params = {}
 
-            if ch_rede:
-                query += " and ch_rede = %(ch_rede)s"
-                params_oracle['ch_rede'] = ch_rede
+            if id_usuario:
+                query += " and id_usuario = %(id_usuario)s"
+                params['id_usuario'] = id_usuario
+            if email:
+                query += " and email = %(email)s"
+                params['email'] = email
 
             dataframe = pd.read_sql(
-                sql=query, con=self.get_connection(), params=params_oracle)
+                sql=query, con=self.get_connection(), params=params)
 
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def get_user_by_id(self, id_usuario: int) -> dict:
-        rotina = 'get_user_by_id'
+    # ------------------------------------------------------------------
+    # Para autenticação: inclui senha_hash. Usado pelo fluxo de login.
+    # ------------------------------------------------------------------
+    def get_credenciais_by_email(self, email: str) -> dict:
+        rotina = 'get_credenciais_by_email'
 
         try:
             query = """
-                select * from usuario
-                where id_usuario = %(id_usuario)s
+                select id_usuario, nome, email, senha_hash
+                from usuario
+                where email = %(email)s
             """
 
-            params = {'id_usuario': id_usuario}
+            params = {'email': email}
 
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params)
@@ -55,25 +65,19 @@ class ControleiUserDAO(base.DAOBase):
         rotina = 'insert_usuario'
 
         try:
-
             cmdSql = """
-                INSERT INTO usuario (ch_rede, matricula, cpf,
-                nome, senha, email)
-                VALUES (%(ch_rede)s,%(matricula)s,%(cpf)s,%(nome)s,
-                  %(senha)s, %(email)s)
+                INSERT INTO usuario (nome, email, senha_hash)
+                VALUES (%(nome)s, %(email)s, %(senha_hash)s)
                 returning id_usuario
             """
 
-            parms_oracle = {
-                "ch_rede": parm_dict.get("ch_rede"),
-                "matricula": parm_dict.get("matricula"),
-                "cpf": parm_dict.get("cpf"),
+            params = {
                 "nome": parm_dict.get("nome"),
-                "senha": parm_dict.get("senha"),
-                "email": parm_dict.get("email")
+                "email": parm_dict.get("email"),
+                "senha_hash": parm_dict.get("senha_hash")
             }
 
-            id_usuario = self.execute_dml_command_parms(cmdSql, parms_oracle)
+            id_usuario = self.execute_dml_command_parms(cmdSql, params)
             return id_usuario
 
         except DAOException as erro:
@@ -86,23 +90,14 @@ class ControleiUserDAO(base.DAOBase):
             cmdSql = """
                 UPDATE usuario
                 SET
-                    ch_rede        = %(ch_rede)s,
-                    matricula        = %(matricula)s,
-                    cpf        = %(cpf)s,
-                    nome        = %(nome)s,
-                    email       = %(email)s,
-                    senha       = %(senha)s
-                  --  alterado_em = NOW()
+                    nome  = %(nome)s,
+                    email = %(email)s
                 WHERE id_usuario = %(id_usuario)s
             """
 
             params = {
                 "id_usuario": parm_dict['id_usuario'],
-                "ch_rede": parm_dict['ch_rede'],
-                "matricula": parm_dict['matricula'],
-                "cpf": parm_dict['cpf'],
                 "nome": parm_dict['nome'],
-                "senha": parm_dict['senha'],
                 "email": parm_dict['email']
             }
 
@@ -111,20 +106,37 @@ class ControleiUserDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def delete_usuario(self, id_usuario: int, ch_rede: str):
+    # Troca de senha isolada: só mexe no hash.
+    def update_senha(self, id_usuario: int, senha_hash: str):
+        rotina = 'update_senha'
+
+        try:
+            cmdSql = """
+                UPDATE usuario
+                SET senha_hash = %(senha_hash)s
+                WHERE id_usuario = %(id_usuario)s
+            """
+
+            params = {
+                "id_usuario": id_usuario,
+                "senha_hash": senha_hash
+            }
+
+            self.execute_dml_command_parms(cmdSql, params)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def delete_usuario(self, id_usuario: int):
         rotina = 'delete_usuario'
 
         try:
             cmdSql = """
                 DELETE FROM usuario
                 WHERE id_usuario = %(id_usuario)s
-                and ch_rede = %(ch_rede)s
             """
 
-            params = {
-                'id_usuario': id_usuario,
-                'ch_rede': ch_rede
-            }
+            params = {'id_usuario': id_usuario}
 
             self.execute_dml_command_parms(cmdSql, params)
 

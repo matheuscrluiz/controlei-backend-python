@@ -6,21 +6,22 @@ from ..dao.controlei_instituicao_dao import ControleiInstituicaoDAO
 class ControleiInstituicaoFacade():
 
     def __init__(self):
-        """construtor da classe ControleiUserFacade"""
+        """construtor da classe ControleiInstituicaoFacade"""
         self.dao = ControleiInstituicaoDAO()
 
     def obter_instituicao(
         self,
         id_instituicao=None,
-
+        id_usuario=None,
     ) -> dict:
         rotina = 'obter_instituicao'
 
         try:
-
-            investimento = self.dao.get_bank(
-                id_instituicao=id_instituicao)
-            return convert_unique_dic_to_arrayDict(investimento)
+            # Traz as compartilhadas + as do próprio usuário.
+            instituicao = self.dao.get_bank(
+                id_instituicao=id_instituicao,
+                id_usuario=id_usuario)
+            return convert_unique_dic_to_arrayDict(instituicao)
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
@@ -29,7 +30,6 @@ class ControleiInstituicaoFacade():
         rotina = 'criar_instituicao'
 
         try:
-
             id_instituicao = self.dao.insert_banks(parm_dict)
             self.dao.database_commit()
 
@@ -42,7 +42,6 @@ class ControleiInstituicaoFacade():
         rotina = 'atualizar_instituicao'
 
         try:
-
             self.dao.update_banks(parm_dict)
             self.dao.database_commit()
 
@@ -51,13 +50,12 @@ class ControleiInstituicaoFacade():
 
     def apagar_instituicao(
             self,
-            id_investimento: int,
+            id_instituicao: int,
     ):
         rotina = 'apagar_instituicao'
 
         try:
-
-            self.dao.delete_banks(id_investimento)
+            self.dao.delete_banks(id_instituicao)
             self.dao.database_commit()
 
         except Exception as erro:

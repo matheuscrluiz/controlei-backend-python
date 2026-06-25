@@ -1,23 +1,29 @@
+from werkzeug.security import check_password_hash
 from ...util.exceptions import FacadeException
-from ..dao.login_dao import LoginDAO
+from ..dao.controlei_usuario_dao import ControleiUserDAO
+from ..dao.controlei_conta_dao import ControleiContaDAO
 
 
 class LoginFacade():
 
     def __init__(self):
         """Construtor da classe LoginFacade"""
-        self.dao = LoginDAO()
+        # Reusa o DAO de usuário: autenticar é
+        #  buscar credenciais + conferir senha.
+        self.dao = ControleiUserDAO()
+        # Para resolver o onboarding já no login (usuário tem conta?).
+        self.conta_dao = ControleiContaDAO()
 
-    def login(self, ch_rede: str, senha: str) -> dict:
+    def login(self, email: str, senha: str) -> dict:
         """
-        Realiza o login de um usuário
+        Realiza o login de um usuário.
 
         Args:
-            ch_rede (str): Chave de rede do usuário
-            senha (str): Senha do usuário
+            email (str): E-mail do usuário
+            senha (str): Senha em texto puro (conferida contra o hash)
 
         Returns:
-            dict: Dados do usuário autenticado
+            dict: Dados do usuário autenticado (sem o hash)
 
         Raises:
             FacadeException: Se as credenciais forem inválidas
@@ -25,25 +31,38 @@ class LoginFacade():
         rotina = 'login'
 
         try:
-            # Validar entrada
-            if not ch_rede or not ch_rede.strip():
-                raise FacadeException(
-                    __file__, rotina, 'ch_rede é obrigatória')
+            if not email or not email.strip():
+                raise FacadeException(__file__, rotina, 'E-mail é obrigatório')
 
             if not senha or not senha.strip():
-                raise FacadeException(
-                    __file__, rotina, 'senha é obrigatória')
+                raise FacadeException(__file__, rotina, 'Senha é obrigatória')
 
-            ch_rede = ch_rede.strip().upper()
+            email = email.strip().lower()
 
-            # Autenticar usuário
-            user = self.dao.authenticate_user(ch_rede, senha)
+            credenciais = self.dao.get_credenciais_by_email(email)
 
-            if not user:
+            # Mensagem genérica de propósito:
+            # não revela se foi o e-mail ou a senha.
+            if not credenciais:
                 raise FacadeException(
                     __file__, rotina, 'Usuário ou senha inválidos')
 
-            return user
+            cred = credenciais[0]
+
+            if not check_password_hash(cred.get('senha_hash') or '', senha):
+                raise FacadeException(
+                    __file__, rotina, 'Usuário ou senha inválidos')
+
+            # Resolve o onboarding aqui: tem ao menos uma conta?
+            contas = self.conta_dao.get_conta(id_usuario=cred['id_usuario'])
+
+            # Devolve só o necessário — o hash nunca sai daqui.
+            return {
+                'id_usuario': cred['id_usuario'],
+                'nome': cred['nome'],
+                'email': cred['email'],
+                'onboarded': bool(contas)
+            }
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)

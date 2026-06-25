@@ -27,6 +27,10 @@ model_get_instituicao = api.parser().add_argument(
     name='id_instituicao',
     type=int,
     help="ID da instituição"
+).add_argument(
+    name='id_usuario',
+    type=int,
+    help="ID do usuário (traz as compartilhadas + as dele)"
 )
 
 
@@ -46,11 +50,13 @@ model_delete_instituicao = api.parser().add_argument(
 class ControleiInstituicao(Resource):
     @api.expect(model_get_instituicao, validate=True)
     def get(self):
-        """Obtém instituições bancárias"""
+        """Obtém instituições (compartilhadas + do usuário)"""
         id_instituicao = request.args.get('id_instituicao')
+        id_usuario = request.args.get('id_usuario')
 
         result = inst_f().obter_instituicao(
-            id_instituicao)
+            id_instituicao=id_instituicao,
+            id_usuario=id_usuario)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -59,7 +65,7 @@ class ControleiInstituicao(Resource):
 
     @api.expect(post_instituicao_model, validate=True)
     def post(self):
-        """Cria uma nova instituticão"""
+        """Cria uma nova instituição"""
         parm_dict = request.get_json()
 
         id_instituicao = inst_f().criar_instituicao(parm_dict)

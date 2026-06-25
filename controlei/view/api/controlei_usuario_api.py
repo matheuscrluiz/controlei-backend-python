@@ -7,6 +7,7 @@ from ...util.constants import MSG_SUCESSO, TIP_RETORNO_SUCESS
 from ...model.facade.controlei_usuario_facade import (
     ControleiUserFacade as user_f
 )
+
 # ---------------------------->>
 # NameSpace
 # ---------------------------->>
@@ -20,18 +21,17 @@ api = Namespace('controlei-user', description='Tabela de usuários')
 put_usuario_model = generate_usuario_model(api, "put")
 post_usuario_model = generate_usuario_model(api, "post")
 
-
 model_get_user = api.parser().add_argument(
-    name='ch_rede',
-    type=str,
-    help="ch_rede do usuário"
-)
-delete_usuario_model = api.parser().add_argument(
-    name='ch_rede',
-    type=str,
-    help="ch_rede do usuário",
-    required=True
+    name='id_usuario',
+    type=int,
+    help="ID do usuário"
 ).add_argument(
+    name='email',
+    type=str,
+    help="E-mail do usuário"
+)
+
+delete_usuario_model = api.parser().add_argument(
     name='id_usuario',
     type=int,
     help="ID do usuário",
@@ -47,9 +47,10 @@ delete_usuario_model = api.parser().add_argument(
 class UsuarioCollection(Resource):
     @api.expect(model_get_user, validate=True)
     def get(self):
-        """Obtém todos usuários ou um usuário específico"""
-        ch_rede = request.args.get('ch_rede')
-        result = user_f().obter_usuario(ch_rede)
+        """Obtém todos os usuários ou um usuário específico"""
+        id_usuario = request.args.get('id_usuario')
+        email = request.args.get('email')
+        result = user_f().obter_usuario(id_usuario=id_usuario, email=email)
 
         return jsonify(
             get_dict_retorno_endpoint(
@@ -87,27 +88,12 @@ class UsuarioCollection(Resource):
     @api.expect(delete_usuario_model, validate=True)
     def delete(self):
         """Deleta um usuário"""
-        facade = user_f()
-        ch_rede = request.args.get('ch_rede')
         id_usuario = request.args.get('id_usuario')
-        facade.deletar_usuario(id_usuario, ch_rede)
+        user_f().deletar_usuario(id_usuario)
 
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS,
                 MSG_SUCESSO,
                 None)
-        )
-
-
-@api.route('/<int:id_usuario>')
-class UsuarioDetail(Resource):
-    def get(self, id_usuario):
-        """Obtém um usuário por ID"""
-        facade = user_f()
-        usuario = facade.dao.get_user_by_id(id_usuario)
-
-        return jsonify(
-            get_dict_retorno_endpoint(
-                TIP_RETORNO_SUCESS, MSG_SUCESSO, usuario)
         )

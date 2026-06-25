@@ -33,7 +33,7 @@ class LoginResource(Resource):
         Realiza o login do usuário
 
         Recebe:
-        - ch_rede: Chave de rede do usuário
+        - email: E-mail do usuário
         - senha: Senha do usuário
 
         Retorna:
@@ -41,11 +41,11 @@ class LoginResource(Resource):
         - Erro se credenciais forem inválidas
         """
         data = request.get_json()
-        ch_rede = data.get('ch_rede')
+        email = data.get('email')
         senha = data.get('senha')
 
         facade = LoginFacade()
-        user_data = facade.login(ch_rede, senha)
+        user_data = facade.login(email, senha)
 
         return jsonify(
             get_dict_retorno_endpoint(
