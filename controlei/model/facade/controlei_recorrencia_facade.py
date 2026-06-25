@@ -134,13 +134,12 @@ class ControleiRecorrenciaFacade():
     def gerar_ocorrencia(self, id_recorrencia: int, data=None):
         """
         Materializa uma ocorrência do mês:
-          - débito/conta -> lançamento 'previsto'
-          (ou 'efetivado' se automático);
+          - débito/conta -> lançamento 'previsto' (ou 'efetivado' se automático);
             recorrência variável entra com valor 0, pra você preencher ao
             confirmar.
           - crédito/cartão -> compra de 1x (cai na fatura do mês).
-        O GATILHO (quando chamar isto) fica a cargo do
-        job/preguiçoso; aqui só a materialização.
+        O GATILHO (quando chamar isto) fica a cargo do job/preguiçoso; aqui só a
+        materialização.
         """
         rotina = 'gerar_ocorrencia'
 
@@ -213,6 +212,38 @@ class ControleiRecorrenciaFacade():
             self.lancamento_dao.database_commit()
 
             return id_lancamento
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def gerar_mes_todos(self):
+        """Gera a ocorrência do mês para TODAS as recorrências ativas
+        (de todos os usuários). Idempotente: o que já existe é ignorado.
+        Pensado para ser chamado por um job/cron."""
+        rotina = 'gerar_mes_todos'
+
+        try:
+            ativas = self.dao.get_recorrencia(ativa=True)
+            geradas = 0
+            puladas = 0
+            erros = 0
+
+            for r in ativas:
+                try:
+                    res = self.gerar_ocorrencia(r['id_recorrencia'])
+                    if isinstance(res, dict) and res.get('gerado') is False:
+                        puladas += 1
+                    else:
+                        geradas += 1
+                except Exception:
+                    erros += 1
+
+            return {
+                'total': len(ativas),
+                'geradas': geradas,
+                'puladas': puladas,
+                'erros': erros,
+            }
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
