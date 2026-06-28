@@ -1,0 +1,18 @@
+on:
+  schedule:
+    - cron: "0 9 * * 5" # Runs at 09:00, only on Friday.
+
+jobs:
+  remove-stale-branches:
+    name: Remove Stale Branches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fpicalausa/remove-stale-branches@v1.6.0
+        with:
+          days-before-branch-stale: 30
+          stale-branch-message: "@{author} Your branch [{branchName}]({branchUrl}) hasn't been updated in the last 30 days and is marked as stale. It will be removed in a week.\r\nIf you want to keep this branch around, delete this comment or add new commits to this branch."
+          dry-run: false # Check out the console output before setting this to false
+          exempt-branches-regex: ^(main|develop|master|release\/.+)$
+          ignore-unknown-authors: true
+          default-recipient: ws-ksda
+          operations-per-run: 30
