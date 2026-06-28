@@ -142,3 +142,5 @@ dmypy.json
 cython_debug/
 *.bat
 controlei/*.bat
+controlei/run_dsv.bat
+
