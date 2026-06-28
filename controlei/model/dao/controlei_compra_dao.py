@@ -62,12 +62,13 @@ class ControleiCompraDAO(base.DAOBase):
             cmdSql = """
                 INSERT INTO compra (
                     id_cartao, id_categoria, dsc_compra, valor_total,
-                    data_compra, num_parcelas, pre_existente, id_recorrencia
+                    data_compra, num_parcelas, pre_existente, id_recorrencia,
+                    import_ref
                 )
                 VALUES (
                     %(id_cartao)s, %(id_categoria)s, %(dsc_compra)s,
                     %(valor_total)s, %(data_compra)s, %(num_parcelas)s,
-                    %(pre_existente)s, %(id_recorrencia)s
+                    %(pre_existente)s, %(id_recorrencia)s, %(import_ref)s
                 )
                 RETURNING id_compra
             """
@@ -81,6 +82,7 @@ class ControleiCompraDAO(base.DAOBase):
                 "num_parcelas": parm_dict.get("num_parcelas"),
                 "pre_existente": parm_dict.get("pre_existente") or False,
                 "id_recorrencia": parm_dict.get("id_recorrencia"),
+                "import_ref": parm_dict.get("import_ref"),
             }
 
             id_compra = self.execute_dml_command_parms(cmdSql, params)
@@ -90,8 +92,7 @@ class ControleiCompraDAO(base.DAOBase):
             raise DAOException(__file__, rotina, erro)
 
     def existe_recorrencia_no_mes(self, id_recorrencia: int, data) -> bool:
-        """True se já existe compra (não cancelada) dessa recorrência no mês
-          de `data`."""
+        """True se já existe compra (não cancelada) dessa recorrência no mês de `data`."""
         rotina = 'existe_recorrencia_no_mes'
 
         try:
@@ -112,12 +113,61 @@ class ControleiCompraDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def existe_import_ref(self, id_cartao: int, import_ref: str) -> bool:
+        """True se já existe compra com esse identificador de importação
+        (FITID) no cartão — usado para deduplicar importações."""
+        rotina = 'existe_import_ref'
+
+        try:
+            cmdSql = """
+                SELECT 1 FROM compra
+                 WHERE id_cartao = %(id_cartao)s
+                   AND import_ref = %(import_ref)s
+                 LIMIT 1
+            """
+            params = {"id_cartao": id_cartao, "import_ref": import_ref}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            resultado = self.convert_dataframe_to_dict(dataframe)
+            return len(resultado) > 0
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_categorias_historico(self, id_cartao: int) -> dict:
+        """Compras já categorizadas do MESMO dono do cartão informado.
+        Base para sugerir categoria na importação."""
+        rotina = 'get_categorias_historico'
+
+        try:
+            cmdSql = """
+                SELECT cp.dsc_compra AS dsc_compra,
+                       cp.id_categoria AS id_categoria
+                FROM compra cp
+                JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                JOIN conta co ON co.id_conta = ca.id_conta
+                WHERE cp.id_categoria IS NOT NULL
+                  AND cp.cancelada = false
+                  AND co.id_usuario = (
+                        SELECT co2.id_usuario
+                        FROM cartao ca2
+                        JOIN conta co2 ON co2.id_conta = ca2.id_conta
+                        WHERE ca2.id_cartao = %(id_cartao)s
+                  )
+            """
+            params = {"id_cartao": id_cartao}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def update_compra(self, parm_dict: dict):
         rotina = 'update_compra'
 
         try:
-            # Edição leve: descrição e categoria.
-            # Valor/nº de parcelas não mudam
+            # Edição leve: descrição e categoria. Valor/nº de parcelas não mudam
             # aqui — alterar isso exigiria regerar as parcelas.
             cmdSql = """
                 UPDATE compra
