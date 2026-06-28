@@ -83,12 +83,14 @@ class ControleiLancamentoDAO(base.DAOBase):
             cmdSql = """
                 INSERT INTO lancamento (
                     id_conta, id_categoria, id_cartao, id_transferencia,
-                    id_recorrencia, natureza, valor, data, descricao, status
+                    id_recorrencia, natureza, valor, data, descricao, status,
+                    import_ref
                 )
                 VALUES (
                     %(id_conta)s, %(id_categoria)s, %(id_cartao)s,
                     %(id_transferencia)s, %(id_recorrencia)s, %(natureza)s,
-                    %(valor)s, %(data)s, %(descricao)s, %(status)s
+                    %(valor)s, %(data)s, %(descricao)s, %(status)s,
+                    %(import_ref)s
                 )
                 RETURNING id_lancamento
             """
@@ -104,10 +106,75 @@ class ControleiLancamentoDAO(base.DAOBase):
                 "data": parm_dict.get("data"),
                 "descricao": parm_dict.get("descricao"),
                 "status": parm_dict.get("status") or 'efetivado',
+                "import_ref": parm_dict.get("import_ref"),
             }
 
             id_lancamento = self.execute_dml_command_parms(cmdSql, params)
             return id_lancamento
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def existe_import_ref(self, id_conta: int, import_ref: str) -> bool:
+        """True se já existe lançamento com esse FITID na conta (dedup)."""
+        rotina = 'existe_import_ref'
+
+        try:
+            cmdSql = """
+                SELECT 1 FROM lancamento
+                 WHERE id_conta = %(id_conta)s
+                   AND import_ref = %(import_ref)s
+                 LIMIT 1
+            """
+            params = {"id_conta": id_conta, "import_ref": import_ref}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            resultado = self.convert_dataframe_to_dict(dataframe)
+            return len(resultado) > 0
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_categorias_historico(self, id_conta: int) -> dict:
+        """Lançamentos já categorizados do dono da conta — base p/ sugestão."""
+        rotina = 'get_categorias_historico'
+
+        try:
+            cmdSql = """
+                SELECT l.descricao AS descricao,
+                       l.id_categoria AS id_categoria
+                FROM lancamento l
+                JOIN conta co ON co.id_conta = l.id_conta
+                WHERE l.id_categoria IS NOT NULL
+                  AND co.id_usuario = (
+                        SELECT co2.id_usuario FROM conta co2
+                        WHERE co2.id_conta = %(id_conta)s
+                  )
+            """
+            params = {"id_conta": id_conta}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_nome_dono_conta(self, id_conta: int):
+        """Nome do usuário dono da conta (p/ detectar transferência própria)."""
+        rotina = 'get_nome_dono_conta'
+
+        try:
+            cmdSql = """
+                SELECT u.nome AS nome
+                FROM conta c
+                JOIN usuario u ON u.id_usuario = c.id_usuario
+                WHERE c.id_conta = %(id_conta)s
+            """
+            params = {"id_conta": id_conta}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            resultado = self.convert_dataframe_to_dict(dataframe)
+            return resultado[0]['nome'] if resultado else None
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)

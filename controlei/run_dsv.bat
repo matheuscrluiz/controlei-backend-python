@@ -10,7 +10,7 @@ echo ---------------------------------------
 set FLASK_APP=wsgi.py
 set FLASK_ENV=development
 set FLASK_DEBUG=1
-
+set CRON_SECRET=044dc1ce0c9aa44e178c3021d032aaf27eb
 echo ---------------------------------------
 echo Iniciando servidor Flask...
 echo ---------------------------------------
