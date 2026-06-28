@@ -1,4 +1,5 @@
 from flask import jsonify, request
+import json
 from flask_restx import Resource
 from flask_restx.namespace import Namespace
 from werkzeug.datastructures import FileStorage
@@ -95,6 +96,69 @@ class ImportarOfxContaConfirmar(Resource):
         body = request.get_json() or {}
         resultado = imp_f().confirmar_conta(
             body.get('id_conta'), body.get('itens'))
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
+        )
+
+
+# ---------------------------->>
+# CSV (fatura ou extrato) — destino por 'destino' + 'id_destino'
+# ---------------------------->>
+csv_inspecionar_parser = api.parser()
+csv_inspecionar_parser.add_argument(
+    'arquivo', location='files', type=FileStorage, required=True,
+    help='Arquivo .csv')
+csv_inspecionar_parser.add_argument(
+    'destino', location='form', type=str, required=True,
+    help="'cartao' ou 'conta'")
+csv_inspecionar_parser.add_argument(
+    'id_destino', location='form', type=int, required=True,
+    help='ID do cartão ou da conta')
+
+csv_preview_parser = api.parser()
+csv_preview_parser.add_argument(
+    'arquivo', location='files', type=FileStorage, required=True,
+    help='Arquivo .csv')
+csv_preview_parser.add_argument(
+    'destino', location='form', type=str, required=True)
+csv_preview_parser.add_argument(
+    'id_destino', location='form', type=int, required=True)
+csv_preview_parser.add_argument(
+    'mapeamento', location='form', type=str, required=True,
+    help='JSON {data, valor, descricao, inverter_sinal}')
+csv_preview_parser.add_argument(
+    'salvar', location='form', type=str, required=False, default='true')
+
+
+@api.route('/csv/inspecionar')
+class ImportarCsvInspecionar(Resource):
+    @api.expect(csv_inspecionar_parser)
+    def post(self):
+        """Lê o CSV: devolve preview (se layout salvo) ou palpite de mapa"""
+        args = csv_inspecionar_parser.parse_args()
+        conteudo = args['arquivo'].read()
+        resultado = imp_f().inspecionar_csv(
+            conteudo, args['destino'], args['id_destino'])
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
+        )
+
+
+@api.route('/csv/preview')
+class ImportarCsvPreview(Resource):
+    @api.expect(csv_preview_parser)
+    def post(self):
+        """Aplica o mapeamento (e memoriza o layout) -> preview"""
+        args = csv_preview_parser.parse_args()
+        conteudo = args['arquivo'].read()
+        mapeamento = json.loads(args['mapeamento'])
+        salvar = str(args.get('salvar', 'true')).lower() != 'false'
+        resultado = imp_f().preview_csv(
+            conteudo, args['destino'], args['id_destino'], mapeamento, salvar)
 
         return jsonify(
             get_dict_retorno_endpoint(
