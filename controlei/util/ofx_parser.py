@@ -4,7 +4,8 @@ Parser OFX mínimo e sem dependências externas.
 Cobre OFX 1.x (SGML, tags de folha não fechadas) e OFX 2.x (XML),
 porque extraímos os campos por regex dentro de cada bloco <STMTTRN>.
 
-Saída: lista de dicts {fitid, data (ISO), descricao, valor (com sinal), trntype}.
+Saída: lista de dicts {fitid, data (ISO), descricao,
+ valor (com sinal), trntype}.
 """
 import re
 from datetime import date

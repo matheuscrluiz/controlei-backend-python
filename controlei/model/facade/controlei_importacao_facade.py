@@ -9,6 +9,7 @@ from ..dao.controlei_lancamento_dao import ControleiLancamentoDAO
 from ..dao.controlei_import_layout_dao import ControleiImportLayoutDAO
 from .controlei_compra_facade import ControleiCompraFacade
 from .controlei_lancamento_facade import ControleiLancamentoFacade
+from ...util import controlei_pdf_ingestor
 
 
 def _chave_desc(desc) -> str:
@@ -112,6 +113,7 @@ class ControleiImportacaoFacade():
                         'tipo': 'compra' if eh_compra else 'credito',
                         'duplicada': duplicada,
                         'id_categoria': sugerida,
+                        'confianca': c.get('confianca'),
                         'selecionar': eh_compra and not duplicada,
                     })
                 else:
@@ -148,6 +150,7 @@ class ControleiImportacaoFacade():
                         'tipo': tipo,
                         'duplicada': duplicada,
                         'id_categoria': sugerida,
+                        'confianca': c.get('confianca'),
                         'selecionar': (not duplicada) and eh_normal,
                     })
 
@@ -344,6 +347,33 @@ class ControleiImportacaoFacade():
                     id_usuario, controlei_csv_ingestor.assinatura(
                         colunas), mapeamento)
                 self.layout_dao.database_commit()
+
+            itens = self.normalizar_e_classificar(canon, destino, id_destino)
+            return {'status': 'preview', 'itens': itens}
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    # =====================================================================
+    # PDF (fatura ou extrato) -> heurística + mesmo estágio 2
+    # =====================================================================
+    def preview_pdf(self, conteudo_bytes, destino: str, id_destino: int):
+        """Extrai transações do PDF (pdfplumber) e devolve o preview.
+        pdfplumber é importado de forma lazy para não exigir a dependência
+        quando o PDF não for usado."""
+        rotina = 'preview_pdf'
+
+        try:
+            if not id_destino:
+                raise FacadeException(
+                    __file__, rotina, 'Destino é obrigatório')
+
+            canon = controlei_pdf_ingestor.extrair_de_pdf(conteudo_bytes)
+
+            # fatura: valores costumam vir positivos (gasto) -> compra (<0)
+            if destino == 'cartao':
+                for c in canon:
+                    c['valor'] = -c['valor']
 
             itens = self.normalizar_e_classificar(canon, destino, id_destino)
             return {'status': 'preview', 'itens': itens}

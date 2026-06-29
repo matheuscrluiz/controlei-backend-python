@@ -164,3 +164,34 @@ class ImportarCsvPreview(Resource):
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
         )
+
+
+# ---------------------------->>
+# PDF (fatura ou extrato)
+# ---------------------------->>
+pdf_preview_parser = api.parser()
+pdf_preview_parser.add_argument(
+    'arquivo', location='files', type=FileStorage, required=True,
+    help='Arquivo .pdf')
+pdf_preview_parser.add_argument(
+    'destino', location='form', type=str, required=True,
+    help="'cartao' ou 'conta'")
+pdf_preview_parser.add_argument(
+    'id_destino', location='form', type=int, required=True,
+    help='ID do cartão ou da conta')
+
+
+@api.route('/pdf/preview')
+class ImportarPdfPreview(Resource):
+    @api.expect(pdf_preview_parser)
+    def post(self):
+        """Extrai transações do PDF e devolve o preview para revisão"""
+        args = pdf_preview_parser.parse_args()
+        conteudo = args['arquivo'].read()
+        resultado = imp_f().preview_pdf(
+            conteudo, args['destino'], args['id_destino'])
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
+        )
