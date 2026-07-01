@@ -42,6 +42,12 @@ p_cofre = api.parser().add_argument(
 p_patrimonio = api.parser().add_argument(
     name='id_usuario', type=int, required=True, help="ID do usuário")
 
+p_despesas_cat = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+).add_argument(
+    name='data_inicio', type=str, required=True, help="Início (YYYY-MM-DD)"
+).add_argument(
+    name='data_fim', type=str, required=True, help="Fim (YYYY-MM-DD)")
 # ---------------------------->>
 # Rotas
 # ---------------------------->>
@@ -117,5 +123,18 @@ class Patrimonio(Resource):
     def get(self):
         """Patrimônio líquido do usuário (saldos + cofres - dívida)"""
         result = deriv_f().patrimonio_usuario(request.args.get('id_usuario'))
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
+
+
+@api.route('/despesas-por-categoria')
+class DespesasPorCategoria(Resource):
+    @api.expect(p_despesas_cat, validate=True)
+    def get(self):
+        """Gastos por categoria no período (conta + cartão)"""
+        result = deriv_f().despesas_por_categoria(
+            request.args.get('id_usuario'),
+            request.args.get('data_inicio'),
+            request.args.get('data_fim'))
         return jsonify(get_dict_retorno_endpoint(
             TIP_RETORNO_SUCESS, MSG_SUCESSO, result))

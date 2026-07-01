@@ -6,9 +6,11 @@ from controlei.util.custom_http_messages import (
 
 from ...util.constants import BLUE_PRINT_BASE_URL
 from ..api.controlei_fatura_api import api as controlei_fatura_api
+from ..api.controlei_health_check_api import api as controlei_health_check_api
 from ..api.controlei_cartao_api import api as controlei_cartao_api
 from ..api.controlei_usuario_api import api as controlei_usuario_api
 from ..api.controlei_categoria_api import api as controlei_categoria_api
+from ..api.controlei_orcamento_api import api as controlei_orcamento_api
 from ..api.controlei_conta_api import (
     api as controlei_conta_api)
 from ..api.controlei_derivados_api import api as controlei_derivados_api
@@ -73,6 +75,7 @@ api = Api(bp, version=API_VERSION, base_url=BLUE_PRINT_BASE_URL,
 # ---------------------------->>
 # Registra as namespaces da API
 # ---------------------------->>
+api.add_namespace(controlei_health_check_api)
 api.add_namespace(controlei_fatura_api)
 api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
@@ -88,6 +91,7 @@ api.add_namespace(controlei_lancamento_api)
 api.add_namespace(controlei_cofre_api)
 api.add_namespace(controlei_transferencia_api)
 api.add_namespace(controlei_importacao_api)
+api.add_namespace(controlei_orcamento_api)
 api.add_namespace(login_api)
 # ---------------------------->>
 # Inicializa a aplicação

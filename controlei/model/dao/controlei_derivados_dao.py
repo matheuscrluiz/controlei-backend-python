@@ -160,6 +160,60 @@ class ControleiDerivadosDAO(base.DAOBase):
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
+            raise DAOException(__file__, 'get_fluxo_mensal', erro)
+
+    def get_despesas_por_categoria(
+            self, id_usuario: int, data_inicio: str, data_fim: str) -> dict:
+        """Gastos por categoria no período: despesas efetivadas em conta
+        (lançamentos) + compras no cartão (não canceladas)."""
+        rotina = 'get_despesas_por_categoria'
+
+        try:
+            query = """
+                WITH gastos AS (
+                    SELECT l.id_categoria AS id_categoria,
+                           ABS(l.valor)  AS valor
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND l.status = 'efetivado'
+                      AND l.natureza = 'despesa'
+                      AND l.data BETWEEN %(ini)s AND %(fim)s
+
+                    UNION ALL
+
+                    SELECT cp.id_categoria  AS id_categoria,
+                           cp.valor_total   AS valor
+                    FROM compra cp
+                    JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                    JOIN conta co2 ON co2.id_conta = ca.id_conta
+                    WHERE co2.id_usuario = %(id_usuario)s
+                      AND cp.cancelada = false
+                      AND cp.data_compra BETWEEN %(ini)s AND %(fim)s
+                )
+                SELECT
+                    g.id_categoria AS id_categoria,
+                    COALESCE(cat.dsc_categoria, 'Sem categoria')
+                        AS dsc_categoria,
+                    SUM(g.valor) AS total
+                FROM gastos g
+                LEFT JOIN categoria cat
+                    ON cat.id_categoria = g.id_categoria
+                GROUP BY g.id_categoria, cat.dsc_categoria
+                ORDER BY total DESC
+            """
+
+            params = {
+                'id_usuario': id_usuario,
+                'ini': data_inicio,
+                'fim': data_fim,
+            }
+
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(), params=params)
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
     def get_cofre_valor(self, id_cofre: int) -> dict:
