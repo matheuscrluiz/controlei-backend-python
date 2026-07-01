@@ -65,3 +65,13 @@ class ControleiDerivadosFacade():
                 'saldos': 0, 'cofres': 0, 'divida': 0, 'patrimonio': 0}
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
+
+    def despesas_por_categoria(
+            self, id_usuario: int, data_inicio: str, data_fim: str):
+        rotina = 'despesas_por_categoria'
+        try:
+            return convert_unique_dic_to_arrayDict(
+                self.dao.get_despesas_por_categoria(
+                    id_usuario, data_inicio, data_fim))
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)

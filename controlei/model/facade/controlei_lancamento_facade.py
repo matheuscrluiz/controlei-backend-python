@@ -62,8 +62,7 @@ class ControleiLancamentoFacade():
                     'ajuste)')
             if valor is None or Decimal(str(valor)) == 0:
                 raise FacadeException(
-                    __file__, rotina,
-                    'Valor é obrigatório e diferente de zero')
+                    __file__, rotina, 'Valor é obrigatório e diferente de zero')
 
             parms = {
                 'id_conta': id_conta,
@@ -76,6 +75,7 @@ class ControleiLancamentoFacade():
                 'data': _normalizar_data(parm_dict.get('data')),
                 'descricao': parm_dict.get('descricao'),
                 'status': (parm_dict.get('status') or 'efetivado'),
+                'import_ref': parm_dict.get('import_ref'),
             }
 
             id_lancamento = self.dao.insert_lancamento(parms)
@@ -124,8 +124,7 @@ class ControleiLancamentoFacade():
 
     def confirmar_lancamento(self, id_lancamento: int, valor=None):
         """Confirma um lançamento 'previsto'. Se `valor` vier (recorrência
-        variável), atualiza o valor (com sinal pela natureza)
-          antes de efetivar."""
+        variável), atualiza o valor (com sinal pela natureza) antes de efetivar."""
         rotina = 'confirmar_lancamento'
 
         try:
