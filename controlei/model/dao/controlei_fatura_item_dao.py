@@ -53,11 +53,11 @@ class ControleiFaturaItemDAO(base.DAOBase):
         try:
             cmdSql = """
                 INSERT INTO fatura_item (
-                    id_fatura, id_compra, tipo, descricao, valor
+                    id_fatura, id_compra, tipo, descricao, valor, import_ref
                 )
                 VALUES (
                     %(id_fatura)s, %(id_compra)s, %(tipo)s,
-                    %(descricao)s, %(valor)s
+                    %(descricao)s, %(valor)s, %(import_ref)s
                 )
                 RETURNING id_fatura_item
             """
@@ -68,10 +68,34 @@ class ControleiFaturaItemDAO(base.DAOBase):
                 "tipo": parm_dict.get("tipo"),
                 "descricao": parm_dict.get("descricao"),
                 "valor": parm_dict.get("valor"),
+                "import_ref": parm_dict.get("import_ref"),
             }
 
             id_item = self.execute_dml_command_parms(cmdSql, params)
             return id_item
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def existe_import_ref(self, id_cartao: int, import_ref: str) -> bool:
+        """True se já existe item de fatura com esse identificador de
+        importação (FITID/hash) no cartão — dedup de créditos/estornos."""
+        rotina = 'existe_import_ref'
+
+        try:
+            cmdSql = """
+                SELECT 1
+                  FROM fatura_item fi
+                  JOIN fatura f ON f.id_fatura = fi.id_fatura
+                 WHERE f.id_cartao = %(id_cartao)s
+                   AND fi.import_ref = %(import_ref)s
+                 LIMIT 1
+            """
+            params = {"id_cartao": id_cartao, "import_ref": import_ref}
+            dataframe = pd.read_sql(
+                sql=cmdSql, con=self.get_connection(), params=params)
+            resultado = self.convert_dataframe_to_dict(dataframe)
+            return len(resultado) > 0
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)

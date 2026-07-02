@@ -51,7 +51,8 @@ class ControleiFaturaItemFacade():
                     'Tipo inválido (abertura, encargo, estorno ou credito)')
             if valor is None or Decimal(str(valor)) == 0:
                 raise FacadeException(
-                    __file__, rotina, 'Valor é obrigatório')
+                    __file__, rotina,
+                    'Valor é obrigatório e diferente de zero')
 
             v = abs(Decimal(str(valor)))
             if tipo in TIPOS_NEGATIVOS:
@@ -63,6 +64,7 @@ class ControleiFaturaItemFacade():
                 'tipo': tipo,
                 'descricao': parm_dict.get('descricao'),
                 'valor': v,
+                'import_ref': parm_dict.get('import_ref'),
             })
             self.dao.database_commit()
 

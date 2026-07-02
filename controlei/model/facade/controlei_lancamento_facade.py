@@ -10,9 +10,16 @@ NATUREZAS_VALIDAS = ('receita', 'despesa', 'transferencia', 'ajuste')
 def _normalizar_data(valor):
     if valor is None:
         return date.today()
+    if isinstance(valor, datetime):
+        return valor.date()
     if isinstance(valor, date):
         return valor
-    return datetime.strptime(str(valor).strip(), '%Y-%m-%d').date()
+    s = str(valor).strip()
+    if not s:
+        return date.today()
+    # Aceita ISO completo (2026-06-10T03:00:00.000Z) pegando só a data.
+    s = s.split('T')[0].split(' ')[0]
+    return datetime.strptime(s, '%Y-%m-%d').date()
 
 
 def _aplicar_sinal(natureza: str, valor):
@@ -62,7 +69,8 @@ class ControleiLancamentoFacade():
                     'ajuste)')
             if valor is None or Decimal(str(valor)) == 0:
                 raise FacadeException(
-                    __file__, rotina, 'Valor é obrigatório e diferente de zero')
+                    __file__, rotina,
+                    'Valor é obrigatório e diferente de zero')
 
             parms = {
                 'id_conta': id_conta,
@@ -124,7 +132,8 @@ class ControleiLancamentoFacade():
 
     def confirmar_lancamento(self, id_lancamento: int, valor=None):
         """Confirma um lançamento 'previsto'. Se `valor` vier (recorrência
-        variável), atualiza o valor (com sinal pela natureza) antes de efetivar."""
+        variável), atualiza o valor
+          (com sinal pela natureza) antes de efetivar."""
         rotina = 'confirmar_lancamento'
 
         try:
