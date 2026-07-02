@@ -8,6 +8,7 @@ from ...util.ofx_parser import parse_ofx
 from ...util import controlei_csv_ingestor
 from ..dao.controlei_compra_dao import ControleiCompraDAO
 from ..dao.controlei_lancamento_dao import ControleiLancamentoDAO
+from ..dao.controlei_fatura_item_dao import ControleiFaturaItemDAO
 from ..dao.controlei_import_layout_dao import ControleiImportLayoutDAO
 from .controlei_compra_facade import ControleiCompraFacade
 from .controlei_lancamento_facade import ControleiLancamentoFacade
@@ -36,6 +37,7 @@ class ControleiImportacaoFacade():
         self.compra_facade = ControleiCompraFacade()
         self.lancamento_dao = ControleiLancamentoDAO()
         self.lancamento_facade = ControleiLancamentoFacade()
+        self.fatura_item_dao = ControleiFaturaItemDAO()
         self.layout_dao = ControleiImportLayoutDAO()
 
     def _mapa_sugestoes(self, id_cartao: int) -> dict:
@@ -91,9 +93,16 @@ class ControleiImportacaoFacade():
                     destino, id_destino, data, valor, descricao)
 
                 if destino == 'cartao':
-                    duplicada = bool(
-                        ref and self.compra_dao.existe_import_ref(
-                            id_destino, ref))
+                    # Compra vive na tabela compra; crédito/estorno vive em
+                    # fatura_item. Checa duplicata na tabela certa pelo sinal.
+                    if valor < 0:
+                        duplicada = bool(
+                            ref and self.compra_dao.existe_import_ref(
+                                id_destino, ref))
+                    else:
+                        duplicada = bool(
+                            ref and self.fatura_item_dao.existe_import_ref(
+                                id_destino, ref))
                 else:
                     duplicada = bool(
                         ref and self.lancamento_dao.existe_import_ref(
@@ -201,11 +210,16 @@ class ControleiImportacaoFacade():
                 # Crédito/estorno (ex.: cashback) não é compra: vira item
                 # de crédito na fatura do mês, abatendo o total.
                 if it.get('tipo') == 'credito':
+                    if fitid and self.fatura_item_dao.existe_import_ref(
+                            id_cartao, fitid):
+                        puladas += 1
+                        continue
                     self.compra_facade.criar_credito_fatura({
                         'id_cartao': id_cartao,
                         'descricao': it.get('descricao'),
                         'valor': it.get('valor'),
                         'data': it.get('data'),
+                        'import_ref': fitid,
                     })
                     criadas += 1
                     continue

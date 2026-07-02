@@ -9,9 +9,16 @@ from .controlei_fatura_item_facade import ControleiFaturaItemFacade
 
 
 def _normalizar_data(valor) -> date:
+    if isinstance(valor, datetime):
+        return valor.date()
     if isinstance(valor, date):
         return valor
-    return datetime.strptime(str(valor).strip(), '%Y-%m-%d').date()
+    s = str(valor).strip()
+    if not s:
+        return date.today()
+    # Aceita ISO completo (2026-06-10T03:00:00.000Z) pegando só a data.
+    s = s.split('T')[0].split(' ')[0]
+    return datetime.strptime(s, '%Y-%m-%d').date()
 
 
 def _proximo_mes(ano: int, mes: int):
@@ -29,7 +36,7 @@ def _add_meses(competencia: date, n: int) -> date:
 def _competencia_base(data_compra: date, dia_fechamento: int) -> date:
     """
     Mês da PRIMEIRA parcela. Compra antes do fechamento
-    cai na fatura deste mês;
+      cai na fatura deste mês;
     a partir do fechamento (inclusive) rola pro mês seguinte.
     """
     if data_compra.day < dia_fechamento:
@@ -207,6 +214,7 @@ class ControleiCompraFacade():
                 'valor': abs(Decimal(str(valor))),
                 'descricao': (parm_dict.get('descricao') or '').strip()
                 or 'Crédito importado',
+                'import_ref': parm_dict.get('import_ref'),
             })
 
         except Exception as erro:
