@@ -28,7 +28,8 @@ def _add_meses(competencia: date, n: int) -> date:
 
 def _competencia_base(data_compra: date, dia_fechamento: int) -> date:
     """
-    Mês da PRIMEIRA parcela. Compra antes do fechamento cai na fatura deste mês;
+    Mês da PRIMEIRA parcela. Compra antes do fechamento
+    cai na fatura deste mês;
     a partir do fechamento (inclusive) rola pro mês seguinte.
     """
     if data_compra.day < dia_fechamento:
@@ -159,6 +160,54 @@ class ControleiCompraFacade():
 
             self.dao.database_commit()
             return id_compra
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def criar_credito_fatura(self, parm_dict: dict):
+        """
+        Cria um crédito/estorno (ex.: cashback) como item da fatura do mês
+        correto. Abate o total da fatura (tipo 'credito' é normalizado como
+        valor negativo pelo fatura_item_facade).
+        """
+        rotina = 'criar_credito_fatura'
+
+        try:
+            id_cartao = parm_dict.get('id_cartao')
+            valor = parm_dict.get('valor')
+
+            if not id_cartao:
+                raise FacadeException(
+                    __file__, rotina, 'ID do cartão é obrigatório')
+            if not valor or Decimal(str(valor)) == 0:
+                raise FacadeException(
+                    __file__, rotina,
+                    'Valor do crédito deve ser diferente de zero')
+
+            data = _normalizar_data(
+                parm_dict.get('data') or date.today())
+
+            cartao = self.cartao_dao.get_cartao(id_cartao=id_cartao)
+            if not cartao:
+                raise FacadeException(
+                    __file__, rotina, 'Cartão não encontrado')
+            dia_fechamento = cartao[0].get('dia_fechamento')
+            if not dia_fechamento:
+                raise FacadeException(
+                    __file__, rotina,
+                    'Crédito no cartão exige cartão com dia de fechamento')
+
+            competencia = _competencia_base(data, int(dia_fechamento))
+            fatura = self.fatura_facade.obter_ou_criar_fatura(
+                id_cartao, competencia)
+
+            return self.item_facade.criar_fatura_item({
+                'id_fatura': fatura['id_fatura'],
+                'tipo': 'credito',
+                'valor': abs(Decimal(str(valor))),
+                'descricao': (parm_dict.get('descricao') or '').strip()
+                or 'Crédito importado',
+            })
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
