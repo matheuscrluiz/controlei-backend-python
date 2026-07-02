@@ -28,7 +28,8 @@ def _add_meses(competencia: date, n: int) -> date:
 
 def _competencia_base(data_compra: date, dia_fechamento: int) -> date:
     """
-    Mês da PRIMEIRA parcela. Compra antes do fechamento cai na fatura deste mês;
+    Mês da PRIMEIRA parcela. Compra antes do fechamento
+    cai na fatura deste mês;
     a partir do fechamento (inclusive) rola pro mês seguinte.
     """
     if data_compra.day < dia_fechamento:
