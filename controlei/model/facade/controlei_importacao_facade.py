@@ -1,6 +1,8 @@
 import re
 import hashlib
 from collections import Counter
+
+from ...util import controlei_pdf_ingestor
 from ...util.exceptions import FacadeException
 from ...util.ofx_parser import parse_ofx
 from ...util import controlei_csv_ingestor
@@ -9,7 +11,6 @@ from ..dao.controlei_lancamento_dao import ControleiLancamentoDAO
 from ..dao.controlei_import_layout_dao import ControleiImportLayoutDAO
 from .controlei_compra_facade import ControleiCompraFacade
 from .controlei_lancamento_facade import ControleiLancamentoFacade
-from ...util import controlei_pdf_ingestor
 
 
 def _chave_desc(desc) -> str:
@@ -105,11 +106,13 @@ class ControleiImportacaoFacade():
                     eh_compra = valor < 0
                     sugerida = (
                         sugestoes.get(memo_norm) if eh_compra else None)
+                    # Compra soma na fatura (+); crédito/estorno abate (-).
+                    valor_assinado = abs(valor) if eh_compra else -abs(valor)
                     itens.append({
                         'fitid': ref,
                         'data': data,
                         'descricao': descricao,
-                        'valor': abs(valor),
+                        'valor': valor_assinado,
                         'tipo': 'compra' if eh_compra else 'credito',
                         'duplicada': duplicada,
                         'id_categoria': sugerida,
@@ -194,6 +197,18 @@ class ControleiImportacaoFacade():
 
             for it in (itens or []):
                 fitid = it.get('fitid')
+
+                # Crédito/estorno (ex.: cashback) não é compra: vira item
+                # de crédito na fatura do mês, abatendo o total.
+                if it.get('tipo') == 'credito':
+                    self.compra_facade.criar_credito_fatura({
+                        'id_cartao': id_cartao,
+                        'descricao': it.get('descricao'),
+                        'valor': it.get('valor'),
+                        'data': it.get('data'),
+                    })
+                    criadas += 1
+                    continue
 
                 if fitid and self.compra_dao.existe_import_ref(
                         id_cartao, fitid):
