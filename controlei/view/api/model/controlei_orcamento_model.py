@@ -17,6 +17,9 @@ def generate_orcamento_model(api, method):
             required=True, description='ID do usuário')
         campos['id_categoria'] = fields.Integer(
             required=True, description='ID da categoria')
+        campos['competencia'] = fields.String(
+            required=False,
+            description='Mês (YYYY-MM-01) para ajuste; ausente = teto padrão')
 
     if method == 'put':
         campos['id_orcamento'] = fields.Integer(

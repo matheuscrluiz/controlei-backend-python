@@ -28,6 +28,11 @@ model_get_orcamento = api.parser().add_argument(
     name='id_usuario', type=int, help="ID do usuário (lista os dele)"
 ).add_argument(
     name='id_categoria', type=int, help="ID da categoria"
+).add_argument(
+    name='competencia', type=str, help="Mês (YYYY-MM-01)"
+).add_argument(
+    name='escopo', type=str,
+    help="padrao | mes | efetivo (default: lista tudo)"
 )
 
 model_delete_orcamento = api.parser().add_argument(
@@ -43,11 +48,23 @@ model_delete_orcamento = api.parser().add_argument(
 class ControleiOrcamento(Resource):
     @api.expect(model_get_orcamento, validate=True)
     def get(self):
-        """Obtém um ou todos os orçamentos"""
-        result = orc_f().obter_orcamento(
-            id_orcamento=request.args.get('id_orcamento'),
-            id_usuario=request.args.get('id_usuario'),
-            id_categoria=request.args.get('id_categoria'))
+        """Obtém orçamentos. escopo: padrao (só padrão) | mes (só ajustes
+        do mês) | efetivo (teto que vale no mês, override ou padrão)."""
+        id_usuario = request.args.get('id_usuario')
+        competencia = request.args.get('competencia')
+        escopo = request.args.get('escopo')
+
+        if escopo == 'efetivo':
+            result = orc_f().obter_efetivo(id_usuario, competencia)
+        elif escopo == 'padrao':
+            result = orc_f().obter_padrao(id_usuario)
+        elif escopo == 'mes':
+            result = orc_f().obter_mes(id_usuario, competencia)
+        else:
+            result = orc_f().obter_orcamento(
+                id_orcamento=request.args.get('id_orcamento'),
+                id_usuario=id_usuario,
+                id_categoria=request.args.get('id_categoria'))
 
         return jsonify(
             get_dict_retorno_endpoint(
