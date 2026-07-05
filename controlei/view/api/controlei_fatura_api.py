@@ -48,6 +48,27 @@ model_get_fatura = api.parser().add_argument(
 # ---------------------------->>
 
 
+model_a_vencer = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+).add_argument(
+    name='dias', type=int, help="Janela em dias (default 7; inclui vencidas)"
+)
+
+
+@api.route('/a-vencer')
+class FaturasAVencer(Resource):
+    @api.expect(model_a_vencer, validate=True)
+    def get(self):
+        """Faturas não pagas a vencer (hoje..+dias) ou já vencidas."""
+        result = fatura_f().obter_faturas_a_vencer(
+            request.args.get('id_usuario'),
+            request.args.get('dias'))
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
+        )
+
+
 @api.route('')
 class FaturaCollection(Resource):
     @api.expect(model_get_fatura, validate=True)
