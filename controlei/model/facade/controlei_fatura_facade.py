@@ -19,7 +19,8 @@ def _proximo_mes(ano: int, mes: int):
 
 
 def _normalizar_competencia(competencia) -> date:
-    """Aceita date ou string ('YYYY-MM'/'YYYY-MM-DD') e devolve o 1º do mês."""
+    """Aceita date ou string ('YYYY-MM' / 'YYYY-MM-DD')
+      e devolve o 1º do mês."""
     if isinstance(competencia, date):
         return date(competencia.year, competencia.month, 1)
     texto = str(competencia).strip()
@@ -59,6 +60,17 @@ class ControleiFaturaFacade():
                 competencia=competencia,
                 id_usuario=id_usuario)
             return convert_unique_dic_to_arrayDict(fatura)
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def obter_faturas_a_vencer(self, id_usuario, dias=7) -> dict:
+        rotina = 'obter_faturas_a_vencer'
+
+        try:
+            d = int(dias) if dias is not None else 7
+            return convert_unique_dic_to_arrayDict(
+                self.dao.get_faturas_a_vencer(id_usuario=id_usuario, dias=d))
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
@@ -138,8 +150,7 @@ class ControleiFaturaFacade():
 
     def atualizar_status_fatura(self, id_fatura: int, status: str):
         """Primitiva de status (aberta/fechada/paga). O 'pagar fatura' completo
-        — com a transferência que baixa o saldo — 
-        virá no fluxo de pagamento."""
+         com a transferência que baixa o saldo — virá no fluxo de pagamento."""
         rotina = 'atualizar_status_fatura'
 
         try:

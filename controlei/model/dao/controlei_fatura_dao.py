@@ -112,6 +112,41 @@ class ControleiFaturaDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def get_faturas_a_vencer(self, id_usuario: int, dias: int = 7):
+        """Faturas não pagas cujo vencimento é hoje..+dias (inclui vencidas),
+        já com total derivado e dias até o vencimento."""
+        rotina = 'get_faturas_a_vencer'
+
+        try:
+            query = """
+                SELECT
+                    f.id_fatura, f.id_cartao, f.competencia,
+                    f.data_vencimento, f.data_fechamento, f.status,
+                    ca.apelido AS apelido_cartao,
+                    ca.ultimos4, ca.bandeira,
+                    co.apelido AS apelido_conta,
+                    COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                              WHERE p.id_fatura = f.id_fatura), 0)
+                  + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
+                              WHERE i.id_fatura = f.id_fatura), 0) AS total,
+                    (f.data_vencimento::date - CURRENT_DATE) AS dias_ate
+                FROM fatura f
+                JOIN cartao ca ON ca.id_cartao = f.id_cartao
+                JOIN conta  co ON co.id_conta  = ca.id_conta
+                WHERE co.id_usuario = %(id_usuario)s
+                  AND f.status <> 'paga'
+                  AND f.data_vencimento::date <= CURRENT_DATE + %(dias)s
+                ORDER BY f.data_vencimento
+            """
+            params = {'id_usuario': id_usuario, 'dias': dias}
+
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(), params=params)
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def update_status_fatura(self, id_fatura: int, status: str):
         rotina = 'update_status_fatura'
 
