@@ -147,6 +147,24 @@ class ControleiFaturaDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def get_ids_faturas_para_fechar(self):
+        """IDs de faturas 'aberta' cujo fechamento já chegou (<= hoje)."""
+        rotina = 'get_ids_faturas_para_fechar'
+
+        try:
+            query = """
+                SELECT id_fatura
+                FROM fatura
+                WHERE status = 'aberta'
+                  AND data_fechamento::date <= CURRENT_DATE
+            """
+            dataframe = pd.read_sql(sql=query, con=self.get_connection())
+            linhas = self.convert_dataframe_to_dict(dataframe)
+            return [line['id_fatura'] for line in linhas]
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def update_status_fatura(self, id_fatura: int, status: str):
         rotina = 'update_status_fatura'
 

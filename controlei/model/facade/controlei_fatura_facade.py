@@ -75,6 +75,24 @@ class ControleiFaturaFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
+    def fechar_faturas_do_dia(self) -> dict:
+        """Fecha (aberta -> fechada) as faturas cujo dia de fechamento já
+        chegou. Idempotente: só toca em 'aberta'. Feito pra rodar no cron."""
+        rotina = 'fechar_faturas_do_dia'
+
+        try:
+            ids = self.dao.get_ids_faturas_para_fechar()
+            fechadas = 0
+            for id_fatura in ids:
+                self.dao.update_status_fatura(id_fatura, 'fechada')
+                fechadas += 1
+            if fechadas:
+                self.dao.database_commit()
+            return {'fechadas': fechadas}
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def obter_ou_criar_fatura(self, id_cartao: int, competencia) -> dict:
         """
         Acha a fatura do cartão naquela competência (mês de referência) ou cria
@@ -150,7 +168,7 @@ class ControleiFaturaFacade():
 
     def atualizar_status_fatura(self, id_fatura: int, status: str):
         """Primitiva de status (aberta/fechada/paga). O 'pagar fatura' completo
-         com a transferência que baixa o saldo — virá no fluxo de pagamento."""
+        com a transferência que baixa o saldo — virá no fluxo de pagamento."""
         rotina = 'atualizar_status_fatura'
 
         try:

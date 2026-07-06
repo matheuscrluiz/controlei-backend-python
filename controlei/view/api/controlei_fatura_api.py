@@ -1,4 +1,5 @@
 from flask import jsonify, request
+import os
 from flask_restx import Resource
 from flask_restx.namespace import Namespace
 from controlei.util.util import get_dict_retorno_endpoint
@@ -54,6 +55,11 @@ model_a_vencer = api.parser().add_argument(
     name='dias', type=int, help="Janela em dias (default 7; inclui vencidas)"
 )
 
+model_fechar_auto = api.parser().add_argument(
+    name='X-Cron-Secret', location='headers', required=True,
+    help="Segredo do cron (igual à env CRON_SECRET)"
+)
+
 
 @api.route('/a-vencer')
 class FaturasAVencer(Resource):
@@ -66,6 +72,26 @@ class FaturasAVencer(Resource):
         return jsonify(
             get_dict_retorno_endpoint(
                 TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
+        )
+
+
+@api.route('/fechar-automatico')
+class FaturasFecharAutomatico(Resource):
+    @api.expect(model_fechar_auto)
+    def post(self):
+        """Fecha (aberta -> fechada) faturas cujo fechamento já chegou.
+        Uso do cron. Protegido por header X-Cron-Secret == env CRON_SECRET."""
+        segredo = os.environ.get('CRON_SECRET')
+        enviado = request.headers.get('X-Cron-Secret')
+
+        if not segredo or enviado != segredo:
+            return {'erro': 'Não autorizado'}, 401
+
+        resultado = fatura_f().fechar_faturas_do_dia()
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
         )
 
 
