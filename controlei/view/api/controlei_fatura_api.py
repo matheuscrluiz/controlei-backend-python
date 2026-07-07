@@ -60,6 +60,11 @@ model_fechar_auto = api.parser().add_argument(
     help="Segredo do cron (igual à env CRON_SECRET)"
 )
 
+model_notificar = api.parser().add_argument(
+    name='X-Cron-Secret', location='headers', required=True,
+    help="Segredo do cron (igual à env CRON_SECRET)"
+)
+
 
 @api.route('/a-vencer')
 class FaturasAVencer(Resource):
@@ -88,6 +93,26 @@ class FaturasFecharAutomatico(Resource):
             return {'erro': 'Não autorizado'}, 401
 
         resultado = fatura_f().fechar_faturas_do_dia()
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado)
+        )
+
+
+@api.route('/notificar')
+class FaturasNotificar(Resource):
+    @api.expect(model_notificar)
+    def post(self):
+        """Envia e-mails de fatura (fechada / a vencer / vencida).
+        Uso do cron. Protegido por header X-Cron-Secret == env CRON_SECRET."""
+        segredo = os.environ.get('CRON_SECRET')
+        enviado = request.headers.get('X-Cron-Secret')
+
+        if not segredo or enviado != segredo:
+            return {'erro': 'Não autorizado'}, 401
+
+        resultado = fatura_f().processar_notificacoes_faturas()
 
         return jsonify(
             get_dict_retorno_endpoint(
