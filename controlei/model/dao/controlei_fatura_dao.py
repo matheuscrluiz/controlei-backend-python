@@ -160,7 +160,67 @@ class ControleiFaturaDAO(base.DAOBase):
             """
             dataframe = pd.read_sql(sql=query, con=self.get_connection())
             linhas = self.convert_dataframe_to_dict(dataframe)
-            return [line['id_fatura'] for line in linhas]
+            return [linha['id_fatura'] for linha in linhas]
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_faturas_para_notificar(self):
+        """Faturas não pagas com tudo que o notificador precisa: e-mail do
+        dono, total, dias até vencer e os controles de notificação."""
+        rotina = 'get_faturas_para_notificar'
+
+        try:
+            query = """
+                SELECT
+                    f.id_fatura, f.competencia, f.data_vencimento, f.status,
+                    (f.data_vencimento::date - CURRENT_DATE) AS dias_ate,
+                    (CURRENT_DATE - f.notif_vencida_em) AS dias_desde_vencida,
+                    ca.apelido AS apelido_cartao, ca.ultimos4,
+                    co.apelido AS apelido_conta,
+                    u.email AS email_usuario, u.nome AS nome_usuario,
+                    COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                              WHERE p.id_fatura = f.id_fatura), 0)
+                  + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
+                              WHERE i.id_fatura = f.id_fatura), 0) AS total,
+                    f.notif_fechada, f.notif_avencer_3,
+                    f.notif_avencer_1, f.notif_vencida_em
+                FROM fatura f
+                JOIN cartao  ca ON ca.id_cartao  = f.id_cartao
+                JOIN conta   co ON co.id_conta   = ca.id_conta
+                JOIN usuario u  ON u.id_usuario  = co.id_usuario
+                WHERE f.status <> 'paga'
+                  AND (
+                        (f.status = 'fechada' AND f.notif_fechada = FALSE)
+                        OR f.data_vencimento::date <= CURRENT_DATE + 3
+                      )
+                ORDER BY f.data_vencimento
+            """
+            dataframe = pd.read_sql(sql=query, con=self.get_connection())
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def marcar_notif(self, id_fatura: int, campo: str, valor):
+        """Marca um controle de notificação. `campo` é validado por lista."""
+        rotina = 'marcar_notif'
+
+        permitidos = {
+            'notif_fechada', 'notif_avencer_3',
+            'notif_avencer_1', 'notif_vencida_em',
+        }
+        if campo not in permitidos:
+            raise DAOException(__file__, rotina, f'Campo inválido: {campo}')
+
+        try:
+            cmdSql = f"""
+                UPDATE fatura
+                SET {campo} = %(valor)s
+                WHERE id_fatura = %(id_fatura)s
+            """
+            params = {'id_fatura': id_fatura, 'valor': valor}
+            self.execute_dml_command_parms(cmdSql, params)
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)

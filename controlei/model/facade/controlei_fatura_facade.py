@@ -2,6 +2,7 @@ import calendar
 from datetime import date, datetime
 from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
+from ...util.controlei_email import enviar_email, render_email
 from ..dao.controlei_fatura_dao import ControleiFaturaDAO
 from ..dao.controlei_cartao_dao import ControleiCartaoDAO
 
@@ -16,6 +17,45 @@ def _data_no_mes(ano: int, mes: int, dia: int) -> date:
 
 def _proximo_mes(ano: int, mes: int):
     return (ano + 1, 1) if mes == 12 else (ano, mes + 1)
+
+
+_MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+          'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+
+def _para_date(valor):
+    if valor is None:
+        return None
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    s = str(valor).split('T')[0].split(' ')[0]
+    for fmt in ('%Y-%m-%d', '%a, %d %b %Y %H:%M:%S %Z', '%d/%m/%Y'):
+        try:
+            return datetime.strptime(str(valor), fmt).date()
+        except ValueError:
+            continue
+    try:
+        return datetime.strptime(s, '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+def _fmt_data(valor) -> str:
+    d = _para_date(valor)
+    return d.strftime('%d/%m/%Y') if d else '—'
+
+
+def _fmt_mes(valor) -> str:
+    d = _para_date(valor)
+    return f"{_MESES[d.month - 1]}/{d.year}" if d else '—'
+
+
+def _fmt_moeda(v: float) -> str:
+    s = f"{float(v):,.2f}"
+    s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"R$ {s}"
 
 
 def _normalizar_competencia(competencia) -> date:
@@ -89,6 +129,108 @@ class ControleiFaturaFacade():
             if fechadas:
                 self.dao.database_commit()
             return {'fechadas': fechadas}
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def processar_notificacoes_faturas(self) -> dict:
+        """Roda no cron diário. Decide e envia e-mails por fatura, com
+        prioridade vencida > a vencer > fechada, e marca cada envio pra
+        não repetir. Defaults: fechada 1x; a vencer em 3 e 1 dia;
+        vencida re-avisa a cada 3 dias até pagar."""
+        rotina = 'processar_notificacoes_faturas'
+
+        try:
+            faturas = self.dao.get_faturas_para_notificar()
+            enviados = {'fechada': 0, 'avencer': 0, 'vencida': 0}
+
+            for f in faturas:
+                email = f.get('email_usuario')
+                if not email:
+                    continue
+
+                dias = f.get('dias_ate')
+                dias = int(dias) if dias is not None else None
+                status = f.get('status')
+                total = float(f.get('total') or 0)
+                nome = f.get('nome_usuario') or ''
+
+                cartao = f.get('apelido_cartao') or 'Cartão'
+                fim = f.get('ultimos4')
+                if fim:
+                    cartao = f"{cartao} ••{fim}"
+                banco = f.get('apelido_conta')
+                venc = _fmt_data(f.get('data_vencimento'))
+                mes = _fmt_mes(f.get('competencia'))
+
+                base_linhas = [('Cartão', cartao)]
+                if banco:
+                    base_linhas.append(('Conta', banco))
+                base_linhas.append(('Competência', mes))
+                base_linhas.append(('Vencimento', venc))
+                base_linhas.append(('Total', _fmt_moeda(total)))
+
+                # ---- VENCIDA (mais urgente) ----
+                if dias is not None and dias < 0:
+                    desde = f.get('dias_desde_vencida')
+                    ja = f.get('notif_vencida_em')
+                    reenviar = (ja is None) or (
+                        desde is not None and int(desde) >= 3)
+                    if reenviar:
+                        atraso = abs(dias)
+                        titulo = "Fatura vencida"
+                        sub = (f"{nome}, sua fatura de {cartao} venceu há "
+                               f"{atraso} dia{'s' if atraso > 1 else ''}.")
+                        html = render_email(
+                            titulo, sub, base_linhas, "Pagar agora")
+                        if enviar_email(email, f"{titulo} — {cartao}", html):
+                            self.dao.marcar_notif(
+                                f['id_fatura'], 'notif_vencida_em',
+                                date.today())
+                            enviados['vencida'] += 1
+                    continue
+
+                # ---- A VENCER (3 e 1 dia) ----
+                if dias == 3 and not f.get('notif_avencer_3'):
+                    titulo = "Fatura a vencer"
+                    sub = f"{nome}, sua fatura de {cartao} vence em 3 dias."
+                    html = render_email(
+                        titulo, sub, base_linhas, "Pagar fatura")
+                    if enviar_email(email, f"{titulo} — {cartao}", html):
+                        self.dao.marcar_notif(
+                            f['id_fatura'], 'notif_avencer_3', True)
+                        enviados['avencer'] += 1
+                    continue
+
+                if dias == 1 and not f.get('notif_avencer_1'):
+                    titulo = "Fatura vence amanhã"
+                    sub = f"{nome}, sua fatura de {cartao} vence amanhã."
+                    html = render_email(
+                        titulo, sub, base_linhas, "Pagar fatura")
+                    if enviar_email(email, f"{titulo} — {cartao}", html):
+                        self.dao.marcar_notif(
+                            f['id_fatura'], 'notif_avencer_1', True)
+                        enviados['avencer'] += 1
+                    continue
+
+                # ---- FECHADA (uma vez) ----
+                if status == 'fechada' and not f.get('notif_fechada'):
+                    titulo = "Fatura fechada"
+                    sub = (f"{nome}, sua fatura de {cartao} fechou. "
+                           f"Vence em {venc}.")
+                    html = render_email(
+                        titulo, sub, base_linhas, "Ver fatura")
+                    if enviar_email(email, f"{titulo} — {cartao}", html):
+                        self.dao.marcar_notif(
+                            f['id_fatura'], 'notif_fechada', True)
+                        enviados['fechada'] += 1
+                    continue
+
+            total_env = sum(enviados.values())
+            if total_env:
+                self.dao.database_commit()
+
+            return {'enviados': total_env, 'detalhe': enviados}
 
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
