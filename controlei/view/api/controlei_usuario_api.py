@@ -128,6 +128,36 @@ class UsuarioPreferencias(Resource):
         )
 
 
+model_tg_link = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+)
+
+
+@api.route('/telegram-link')
+class UsuarioTelegramLink(Resource):
+    @api.expect(model_tg_link, validate=True)
+    def post(self):
+        """Gera o deep link t.me para o usuário vincular o Telegram."""
+        id_usuario = request.args.get('id_usuario')
+        result = user_f().gerar_link_telegram(id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
+        )
+
+    @api.expect(model_tg_link, validate=True)
+    def delete(self):
+        """Desvincula o Telegram do usuário."""
+        id_usuario = request.args.get('id_usuario')
+        user_f().desvincular_telegram(id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, None)
+        )
+
+
 @api.route('/<int:id_usuario>')
 class UsuarioDetail(Resource):
     def get(self, id_usuario):

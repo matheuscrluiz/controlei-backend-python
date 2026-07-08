@@ -3,6 +3,7 @@ from datetime import date, datetime
 from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
 from ...util.controlei_email import enviar_email, render_email
+from ...util.controlei_telegram import enviar_telegram, render_telegram
 from ..dao.controlei_fatura_dao import ControleiFaturaDAO
 from ..dao.controlei_cartao_dao import ControleiCartaoDAO
 
@@ -59,8 +60,7 @@ def _fmt_moeda(v: float) -> str:
 
 
 def _normalizar_competencia(competencia) -> date:
-    """Aceita date ou string ('YYYY-MM' / 'YYYY-MM-DD')
-      e devolve o 1º do mês."""
+    """Aceita date ou string ('YYYY-MM' / 'YYYY-MM-DD') e devolve o 1º do mês."""
     if isinstance(competencia, date):
         return date(competencia.year, competencia.month, 1)
     texto = str(competencia).strip()
@@ -144,10 +144,19 @@ class ControleiFaturaFacade():
             faturas = self.dao.get_faturas_para_notificar()
             enviados = {'fechada': 0, 'avencer': 0, 'vencida': 0}
 
-            for f in faturas:
+            def _despachar(f, assunto, html, texto_tg) -> bool:
+                """Envia pelos canais ligados do usuário.
+                Sucesso = pelo menos um canal entregou."""
+                ok = False
                 email = f.get('email_destino') or f.get('email_usuario')
-                if not email:
-                    continue
+                if f.get('notif_email_ativo') and email:
+                    ok = enviar_email(email, assunto, html) or ok
+                chat_id = f.get('telegram_chat_id')
+                if f.get('notif_telegram_ativo') and chat_id:
+                    ok = enviar_telegram(str(chat_id), texto_tg) or ok
+                return ok
+
+            for f in faturas:
 
                 dias = f.get('dias_ate')
                 dias = int(dias) if dias is not None else None
@@ -186,7 +195,10 @@ class ControleiFaturaFacade():
                         html = render_email(
                             titulo, sub, base_linhas, "Pagar agora",
                             etiqueta="Vencida", acento="#E15C6B")
-                        if enviar_email(email, f"{titulo} — {cartao}", html):
+                        texto_tg = render_telegram(
+                            titulo, sub, base_linhas, emoji="🚨")
+                        if _despachar(
+                                f, f"{titulo} — {cartao}", html, texto_tg):
                             self.dao.marcar_notif(
                                 f['id_fatura'], 'notif_vencida_em',
                                 date.today())
@@ -202,7 +214,9 @@ class ControleiFaturaFacade():
                     html = render_email(
                         titulo, sub, base_linhas, "Pagar fatura",
                         etiqueta="Vence em 3 dias", acento="#E0A23C")
-                    if enviar_email(email, f"{titulo} — {cartao}", html):
+                    texto_tg = render_telegram(
+                        titulo, sub, base_linhas, emoji="⏳")
+                    if _despachar(f, f"{titulo} — {cartao}", html, texto_tg):
                         self.dao.marcar_notif(
                             f['id_fatura'], 'notif_avencer_3', True)
                         enviados['avencer'] += 1
@@ -216,7 +230,9 @@ class ControleiFaturaFacade():
                     html = render_email(
                         titulo, sub, base_linhas, "Pagar fatura",
                         etiqueta="Vence amanhã", acento="#E0A23C")
-                    if enviar_email(email, f"{titulo} — {cartao}", html):
+                    texto_tg = render_telegram(
+                        titulo, sub, base_linhas, emoji="⏰")
+                    if _despachar(f, f"{titulo} — {cartao}", html, texto_tg):
                         self.dao.marcar_notif(
                             f['id_fatura'], 'notif_avencer_1', True)
                         enviados['avencer'] += 1
@@ -232,7 +248,9 @@ class ControleiFaturaFacade():
                     html = render_email(
                         titulo, sub, base_linhas, "Ver fatura",
                         etiqueta="Fatura fechada", acento="#0FA088")
-                    if enviar_email(email, f"{titulo} — {cartao}", html):
+                    texto_tg = render_telegram(
+                        titulo, sub, base_linhas, emoji="✅")
+                    if _despachar(f, f"{titulo} — {cartao}", html, texto_tg):
                         self.dao.marcar_notif(
                             f['id_fatura'], 'notif_fechada', True)
                         enviados['fechada'] += 1
@@ -322,7 +340,7 @@ class ControleiFaturaFacade():
 
     def atualizar_status_fatura(self, id_fatura: int, status: str):
         """Primitiva de status (aberta/fechada/paga). O 'pagar fatura' completo
-        com a transferência que baixa o saldo — virá no fluxo de pagamento."""
+        — com a transferência que baixa o saldo — virá no fluxo de pagamento."""
         rotina = 'atualizar_status_fatura'
 
         try:
