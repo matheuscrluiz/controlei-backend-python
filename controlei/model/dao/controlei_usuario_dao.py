@@ -127,6 +127,56 @@ class ControleiUserDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def get_preferencias(self, id_usuario: int) -> dict:
+        rotina = 'get_preferencias'
+
+        try:
+            query = """
+                select id_usuario, nome, email,
+                       notif_email_ativo, notif_fechada_ativa,
+                       notif_avencer_ativa, notif_vencida_ativa,
+                       notif_email_destino
+                from usuario
+                where id_usuario = %(id_usuario)s
+            """
+            params = {'id_usuario': id_usuario}
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(), params=params)
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def update_preferencias(self, parm_dict: dict):
+        rotina = 'update_preferencias'
+
+        try:
+            cmdSql = """
+                UPDATE usuario SET
+                    notif_email_ativo   = %(notif_email_ativo)s,
+                    notif_fechada_ativa = %(notif_fechada_ativa)s,
+                    notif_avencer_ativa = %(notif_avencer_ativa)s,
+                    notif_vencida_ativa = %(notif_vencida_ativa)s,
+                    notif_email_destino = %(notif_email_destino)s
+                WHERE id_usuario = %(id_usuario)s
+            """
+            params = {
+                'id_usuario': parm_dict.get('id_usuario'),
+                'notif_email_ativo': parm_dict.get('notif_email_ativo', True),
+                'notif_fechada_ativa':
+                    parm_dict.get('notif_fechada_ativa', True),
+                'notif_avencer_ativa':
+                    parm_dict.get('notif_avencer_ativa', True),
+                'notif_vencida_ativa':
+                    parm_dict.get('notif_vencida_ativa', True),
+                'notif_email_destino':
+                    parm_dict.get('notif_email_destino') or None,
+            }
+            self.execute_dml_command_parms(cmdSql, params)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def delete_usuario(self, id_usuario: int):
         rotina = 'delete_usuario'
 

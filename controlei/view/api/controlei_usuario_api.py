@@ -97,3 +97,45 @@ class UsuarioCollection(Resource):
                 MSG_SUCESSO,
                 None)
         )
+
+
+model_get_pref = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+)
+
+
+@api.route('/preferencias')
+class UsuarioPreferencias(Resource):
+    @api.expect(model_get_pref, validate=True)
+    def get(self):
+        """Preferências de e-mail do usuário."""
+        id_usuario = request.args.get('id_usuario')
+        result = user_f().obter_preferencias(id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
+        )
+
+    def put(self):
+        """Atualiza as preferências de e-mail do usuário."""
+        parm_dict = request.get_json()
+        user_f().atualizar_preferencias(parm_dict)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, None)
+        )
+
+
+@api.route('/<int:id_usuario>')
+class UsuarioDetail(Resource):
+    def get(self, id_usuario):
+        """Obtém um usuário por ID"""
+        facade = user_f()
+        usuario = facade.dao.get_user(id_usuario=id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, usuario)
+        )
