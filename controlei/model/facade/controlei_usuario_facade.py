@@ -102,6 +102,30 @@ class ControleiUserFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
+    def obter_preferencias(self, id_usuario) -> dict:
+        rotina = 'obter_preferencias'
+
+        try:
+            pref = self.dao.get_preferencias(id_usuario)
+            return convert_unique_dic_to_arrayDict(pref)
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def atualizar_preferencias(self, parm_dict: dict):
+        rotina = 'atualizar_preferencias'
+
+        try:
+            if not parm_dict.get('id_usuario'):
+                raise FacadeException(
+                    __file__, rotina, 'ID do usuário é obrigatório')
+
+            self.dao.update_preferencias(parm_dict)
+            self.dao.database_commit()
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def deletar_usuario(self, id_usuario: int):
         rotina = 'deletar_usuario'
 

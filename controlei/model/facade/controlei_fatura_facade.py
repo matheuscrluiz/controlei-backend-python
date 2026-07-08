@@ -145,7 +145,7 @@ class ControleiFaturaFacade():
             enviados = {'fechada': 0, 'avencer': 0, 'vencida': 0}
 
             for f in faturas:
-                email = f.get('email_usuario')
+                email = f.get('email_destino') or f.get('email_usuario')
                 if not email:
                     continue
 
@@ -172,6 +172,8 @@ class ControleiFaturaFacade():
 
                 # ---- VENCIDA (mais urgente) ----
                 if dias is not None and dias < 0:
+                    if not f.get('notif_vencida_ativa'):
+                        continue
                     desde = f.get('dias_desde_vencida')
                     ja = f.get('notif_vencida_em')
                     reenviar = (ja is None) or (
@@ -182,7 +184,8 @@ class ControleiFaturaFacade():
                         sub = (f"{nome}, sua fatura de {cartao} venceu há "
                                f"{atraso} dia{'s' if atraso > 1 else ''}.")
                         html = render_email(
-                            titulo, sub, base_linhas, "Pagar agora")
+                            titulo, sub, base_linhas, "Pagar agora",
+                            etiqueta="Vencida", acento="#E15C6B")
                         if enviar_email(email, f"{titulo} — {cartao}", html):
                             self.dao.marcar_notif(
                                 f['id_fatura'], 'notif_vencida_em',
@@ -192,10 +195,13 @@ class ControleiFaturaFacade():
 
                 # ---- A VENCER (3 e 1 dia) ----
                 if dias == 3 and not f.get('notif_avencer_3'):
+                    if not f.get('notif_avencer_ativa'):
+                        continue
                     titulo = "Fatura a vencer"
                     sub = f"{nome}, sua fatura de {cartao} vence em 3 dias."
                     html = render_email(
-                        titulo, sub, base_linhas, "Pagar fatura")
+                        titulo, sub, base_linhas, "Pagar fatura",
+                        etiqueta="Vence em 3 dias", acento="#E0A23C")
                     if enviar_email(email, f"{titulo} — {cartao}", html):
                         self.dao.marcar_notif(
                             f['id_fatura'], 'notif_avencer_3', True)
@@ -203,10 +209,13 @@ class ControleiFaturaFacade():
                     continue
 
                 if dias == 1 and not f.get('notif_avencer_1'):
+                    if not f.get('notif_avencer_ativa'):
+                        continue
                     titulo = "Fatura vence amanhã"
                     sub = f"{nome}, sua fatura de {cartao} vence amanhã."
                     html = render_email(
-                        titulo, sub, base_linhas, "Pagar fatura")
+                        titulo, sub, base_linhas, "Pagar fatura",
+                        etiqueta="Vence amanhã", acento="#E0A23C")
                     if enviar_email(email, f"{titulo} — {cartao}", html):
                         self.dao.marcar_notif(
                             f['id_fatura'], 'notif_avencer_1', True)
@@ -215,11 +224,14 @@ class ControleiFaturaFacade():
 
                 # ---- FECHADA (uma vez) ----
                 if status == 'fechada' and not f.get('notif_fechada'):
+                    if not f.get('notif_fechada_ativa'):
+                        continue
                     titulo = "Fatura fechada"
                     sub = (f"{nome}, sua fatura de {cartao} fechou. "
                            f"Vence em {venc}.")
                     html = render_email(
-                        titulo, sub, base_linhas, "Ver fatura")
+                        titulo, sub, base_linhas, "Ver fatura",
+                        etiqueta="Fatura fechada", acento="#0FA088")
                     if enviar_email(email, f"{titulo} — {cartao}", html):
                         self.dao.marcar_notif(
                             f['id_fatura'], 'notif_fechada', True)

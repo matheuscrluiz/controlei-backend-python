@@ -179,6 +179,9 @@ class ControleiFaturaDAO(base.DAOBase):
                     ca.apelido AS apelido_cartao, ca.ultimos4,
                     co.apelido AS apelido_conta,
                     u.email AS email_usuario, u.nome AS nome_usuario,
+                    COALESCE(u.notif_email_destino, u.email) AS email_destino,
+                    u.notif_fechada_ativa, u.notif_avencer_ativa,
+                    u.notif_vencida_ativa,
                     COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
                               WHERE p.id_fatura = f.id_fatura), 0)
                   + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
@@ -190,6 +193,7 @@ class ControleiFaturaDAO(base.DAOBase):
                 JOIN conta   co ON co.id_conta   = ca.id_conta
                 JOIN usuario u  ON u.id_usuario  = co.id_usuario
                 WHERE f.status <> 'paga'
+                  AND u.notif_email_ativo = TRUE
                   AND (
                         (f.status = 'fechada' AND f.notif_fechada = FALSE)
                         OR f.data_vencimento::date <= CURRENT_DATE + 3
