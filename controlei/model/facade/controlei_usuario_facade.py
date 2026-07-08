@@ -1,6 +1,9 @@
+import secrets
 from werkzeug.security import generate_password_hash
 from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
+from ...util.controlei_telegram import (
+    enviar_telegram, montar_link_vinculo)
 from ..dao.controlei_usuario_dao import ControleiUserDAO
 
 
@@ -97,6 +100,89 @@ class ControleiUserFacade():
                 self.dao.update_senha(
                     id_usuario, generate_password_hash(senha))
 
+            self.dao.database_commit()
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def obter_preferencias(self, id_usuario) -> dict:
+        rotina = 'obter_preferencias'
+
+        try:
+            pref = self.dao.get_preferencias(id_usuario)
+            return convert_unique_dic_to_arrayDict(pref)
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def atualizar_preferencias(self, parm_dict: dict):
+        rotina = 'atualizar_preferencias'
+
+        try:
+            if not parm_dict.get('id_usuario'):
+                raise FacadeException(
+                    __file__, rotina, 'ID do usuário é obrigatório')
+
+            self.dao.update_preferencias(parm_dict)
+            self.dao.database_commit()
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def gerar_link_telegram(self, id_usuario) -> dict:
+        """Gera o token de vínculo e devolve o deep link t.me pro usuário."""
+        rotina = 'gerar_link_telegram'
+
+        try:
+            if not id_usuario:
+                raise FacadeException(
+                    __file__, rotina, 'ID do usuário é obrigatório')
+
+            token = secrets.token_urlsafe(24)
+            self.dao.set_telegram_link_token(id_usuario, token)
+            self.dao.database_commit()
+
+            return {'link': montar_link_vinculo(token)}
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def processar_start_telegram(self, token: str, chat_id) -> bool:
+        """Chamado pelo webhook no /start <token>: vincula e dá boas-vindas."""
+        rotina = 'processar_start_telegram'
+
+        try:
+            if not token or not chat_id:
+                return False
+
+            id_usuario = self.dao.vincular_telegram_por_token(
+                token, str(chat_id))
+            if not id_usuario:
+                enviar_telegram(
+                    str(chat_id),
+                    "❌ Link de vínculo inválido ou expirado. "
+                    "Gere um novo nas preferências do Controlei.")
+                return False
+
+            self.dao.database_commit()
+            enviar_telegram(
+                str(chat_id),
+                "✅ <b>Telegram vinculado ao Controlei!</b>\n"
+                "Você vai receber por aqui os avisos de fatura "
+                "(fechada, a vencer e vencida), conforme suas preferências.")
+            return True
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def desvincular_telegram(self, id_usuario):
+        rotina = 'desvincular_telegram'
+
+        try:
+            if not id_usuario:
+                raise FacadeException(
+                    __file__, rotina, 'ID do usuário é obrigatório')
+            self.dao.desvincular_telegram(id_usuario)
             self.dao.database_commit()
 
         except Exception as erro:
