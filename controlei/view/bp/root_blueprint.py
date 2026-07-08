@@ -27,6 +27,7 @@ from ..api.controlei_transferencia_api import (
 from ..api.controlei_cofre_api import api as controlei_cofre_api
 from ..api.controlei_lancamento_api import api as controlei_lancamento_api
 from ..api.controlei_importacao_api import api as controlei_importacao_api
+from ..api.controlei_telegram_api import api as controlei_telegram_api
 from ..api.login_api import api as login_api
 # ---------------------------->>
 # Constants
@@ -92,6 +93,7 @@ api.add_namespace(controlei_cofre_api)
 api.add_namespace(controlei_transferencia_api)
 api.add_namespace(controlei_importacao_api)
 api.add_namespace(controlei_orcamento_api)
+api.add_namespace(controlei_telegram_api)
 api.add_namespace(login_api)
 # ---------------------------->>
 # Inicializa a aplicação

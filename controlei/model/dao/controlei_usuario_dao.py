@@ -135,7 +135,9 @@ class ControleiUserDAO(base.DAOBase):
                 select id_usuario, nome, email,
                        notif_email_ativo, notif_fechada_ativa,
                        notif_avencer_ativa, notif_vencida_ativa,
-                       notif_email_destino
+                       notif_email_destino,
+                       notif_telegram_ativo,
+                       (telegram_chat_id IS NOT NULL) AS telegram_vinculado
                 from usuario
                 where id_usuario = %(id_usuario)s
             """
@@ -157,7 +159,8 @@ class ControleiUserDAO(base.DAOBase):
                     notif_fechada_ativa = %(notif_fechada_ativa)s,
                     notif_avencer_ativa = %(notif_avencer_ativa)s,
                     notif_vencida_ativa = %(notif_vencida_ativa)s,
-                    notif_email_destino = %(notif_email_destino)s
+                    notif_email_destino = %(notif_email_destino)s,
+                    notif_telegram_ativo = %(notif_telegram_ativo)s
                 WHERE id_usuario = %(id_usuario)s
             """
             params = {
@@ -171,8 +174,75 @@ class ControleiUserDAO(base.DAOBase):
                     parm_dict.get('notif_vencida_ativa', True),
                 'notif_email_destino':
                     parm_dict.get('notif_email_destino') or None,
+                'notif_telegram_ativo':
+                    parm_dict.get('notif_telegram_ativo', False),
             }
             self.execute_dml_command_parms(cmdSql, params)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def set_telegram_link_token(self, id_usuario: int, token: str):
+        """Grava o token temporário do deep link de vínculo."""
+        rotina = 'set_telegram_link_token'
+
+        try:
+            cmdSql = """
+                UPDATE usuario SET telegram_link_token = %(token)s
+                WHERE id_usuario = %(id_usuario)s
+            """
+            self.execute_dml_command_parms(
+                cmdSql, {'id_usuario': id_usuario, 'token': token})
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def vincular_telegram_por_token(self, token: str, chat_id: str) -> int:
+        """Acha o usuário pelo token do deep link, grava o chat_id, limpa o
+        token e liga o canal. Retorna o id_usuario ou None."""
+        rotina = 'vincular_telegram_por_token'
+
+        try:
+            query = """
+                SELECT id_usuario FROM usuario
+                WHERE telegram_link_token = %(token)s
+            """
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(),
+                params={'token': token})
+            linhas = self.convert_dataframe_to_dict(dataframe)
+            if not linhas:
+                return None
+
+            id_usuario = linhas[0]['id_usuario']
+            cmdSql = """
+                UPDATE usuario SET
+                    telegram_chat_id = %(chat_id)s,
+                    telegram_link_token = NULL,
+                    notif_telegram_ativo = TRUE
+                WHERE id_usuario = %(id_usuario)s
+            """
+            self.execute_dml_command_parms(
+                cmdSql, {'id_usuario': id_usuario, 'chat_id': str(chat_id)})
+            return id_usuario
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def desvincular_telegram(self, id_usuario: int):
+        """Remove o vínculo e desliga o canal."""
+        rotina = 'desvincular_telegram'
+
+        try:
+            cmdSql = """
+                UPDATE usuario SET
+                    telegram_chat_id = NULL,
+                    telegram_link_token = NULL,
+                    notif_telegram_ativo = FALSE
+                WHERE id_usuario = %(id_usuario)s
+            """
+            self.execute_dml_command_parms(
+                cmdSql, {'id_usuario': id_usuario})
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
