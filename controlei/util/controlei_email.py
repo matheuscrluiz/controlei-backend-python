@@ -65,28 +65,59 @@ def render_email(
         titulo: str,
         subtitulo: str,
         linhas: list,
-        cta_texto: str = None) -> str:
-    """Template base único. `linhas` = lista de (label, valor)."""
+        cta_texto: str = None,
+        etiqueta: str = None,
+        acento: str = TEAL) -> str:
+    """Template base único. `linhas` = lista de (label, valor).
+    `etiqueta` = selo colorido no topo (ex.: 'Vencida'); `acento` = cor
+    do selo/botão/faixa (coral, âmbar ou teal conforme o fluxo)."""
     app_url = os.environ.get("APP_URL")
+    logo_url = os.environ.get("LOGO_URL")
 
-    linhas_html = "".join(
-        f"""
+    if logo_url:
+        marca = (
+            f'<img src="{logo_url}" alt="Controlei" height="26" '
+            f'style="display:block;border:0;height:26px;">'
+        )
+    else:
+        marca = (
+            f'<span style="color:#fff;font-size:18px;font-weight:800;'
+            f'letter-spacing:-.02em;">Controlei</span>'
+        )
+
+    selo = ""
+    if etiqueta:
+        selo = (
+            f'<span style="display:inline-block;background:{acento};'
+            f'color:#fff;font-size:11px;font-weight:800;text-transform:'
+            f'uppercase;letter-spacing:.04em;padding:5px 10px;'
+            f'border-radius:999px;margin-bottom:12px;">{etiqueta}</span>'
+        )
+
+    # Última linha (Total) recebe destaque maior.
+    ult = len(linhas) - 1
+    linhas_html = ""
+    for i, (lbl, val) in enumerate(linhas):
+        grande = i == ult
+        cor_val = acento if grande else INK
+        tam = "18px" if grande else "14px"
+        borda = "" if grande else "border-bottom:1px solid #f0f5f2;"
+        linhas_html += f"""
         <tr>
-          <td style="padding:6px 0;color:{MUTED};font-size:14px;">{lbl}</td>
-          <td style="padding:6px 0;color:{INK};font-size:14px;
-                     font-weight:700;text-align:right;">{val}</td>
+          <td style="padding:9px 0;color:{MUTED};font-size:14px;{borda}">
+            {lbl}</td>
+          <td style="padding:9px 0;color:{cor_val};font-size:{tam};
+                     font-weight:800;text-align:right;{borda}">{val}</td>
         </tr>
         """
-        for (lbl, val) in linhas
-    )
 
     botao = ""
     if cta_texto and app_url:
         botao = f"""
-        <tr><td style="padding-top:22px;">
-          <a href="{app_url}" style="display:inline-block;background:{TEAL};
+        <tr><td style="padding-top:24px;">
+          <a href="{app_url}" style="display:inline-block;background:{acento};
              color:#fff;text-decoration:none;font-weight:700;font-size:14px;
-             padding:12px 22px;border-radius:10px;">{cta_texto}</a>
+             padding:13px 26px;border-radius:10px;">{cta_texto}</a>
         </td></tr>
         """
 
@@ -100,19 +131,17 @@ def render_email(
              style="max-width:480px;width:100%;background:#fff;
                     border-radius:16px;overflow:hidden;
                     border:1px solid #e3ede8;">
-        <tr><td style="background:{NAVY};padding:18px 24px;">
-          <span style="color:#fff;font-size:18px;font-weight:800;
-                       letter-spacing:-.02em;">Controlei</span>
-        </td></tr>
-        <tr><td style="padding:24px;">
-          <div style="color:{INK};font-size:20px;font-weight:800;
-                      margin-bottom:6px;">{titulo}</div>
-          <div style="color:{MUTED};font-size:14px;margin-bottom:18px;">
-            {subtitulo}</div>
+        <tr><td style="background:{NAVY};padding:18px 24px;">{marca}</td></tr>
+        <tr><td style="height:4px;background:{acento};line-height:4px;
+                       font-size:0;">&nbsp;</td></tr>
+        <tr><td style="padding:26px 24px 24px;">
+          {selo}
+          <div style="color:{INK};font-size:21px;font-weight:800;
+                      margin-bottom:6px;line-height:1.25;">{titulo}</div>
+          <div style="color:{MUTED};font-size:14px;margin-bottom:18px;
+                      line-height:1.5;">{subtitulo}</div>
           <table role="presentation" width="100%" cellpadding="0"
-                 cellspacing="0"
-                 style="border-top:1px solid #eaf1ed;
-                        border-bottom:1px solid #eaf1ed;padding:4px 0;">
+                 cellspacing="0">
             {linhas_html}
           </table>
           <table role="presentation" cellpadding="0" cellspacing="0">
@@ -120,7 +149,7 @@ def render_email(
           </table>
         </td></tr>
         <tr><td style="padding:16px 24px;border-top:1px solid #eaf1ed;
-                       color:{MUTED};font-size:12px;">
+                       color:{MUTED};font-size:12px;line-height:1.5;">
           Você recebe este aviso porque tem faturas no Controlei.
         </td></tr>
       </table>
