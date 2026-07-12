@@ -1,4 +1,5 @@
 from werkzeug.security import check_password_hash
+from ...util.controlei_jwt import gerar_token
 from ...util.exceptions import FacadeException
 from ..dao.controlei_usuario_dao import ControleiUserDAO
 from ..dao.controlei_conta_dao import ControleiContaDAO
@@ -61,7 +62,10 @@ class LoginFacade():
                 'id_usuario': cred['id_usuario'],
                 'nome': cred['nome'],
                 'email': cred['email'],
-                'onboarded': bool(contas)
+                'onboarded': bool(contas),
+                # Token de sessão (24h): o front envia em
+                # Authorization: Bearer <token> em toda chamada.
+                'token': gerar_token(cred['id_usuario'])
             }
 
         except Exception as erro:

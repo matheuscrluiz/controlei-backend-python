@@ -19,4 +19,6 @@ def generate_login_response_model(api):
         'email': fields.String(description='E-mail do usuário'),
         'onboarded': fields.Boolean(
             description='Usuário já tem conta (passou pelo onboarding)'),
+        'token': fields.String(
+            description='Token de sessão (Bearer) válido por 24h'),
     })

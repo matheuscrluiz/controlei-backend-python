@@ -1,16 +1,16 @@
+import os
 from flask import Blueprint
 from flask_restx import Api
 
 from controlei.util.custom_http_messages import (
     custom_http_after_request, custom_http_erros)
+from controlei.util.controlei_auth_guard import registrar_guarda
 
 from ...util.constants import BLUE_PRINT_BASE_URL
 from ..api.controlei_fatura_api import api as controlei_fatura_api
-from ..api.controlei_health_check_api import api as controlei_health_check_api
 from ..api.controlei_cartao_api import api as controlei_cartao_api
 from ..api.controlei_usuario_api import api as controlei_usuario_api
 from ..api.controlei_categoria_api import api as controlei_categoria_api
-from ..api.controlei_orcamento_api import api as controlei_orcamento_api
 from ..api.controlei_conta_api import (
     api as controlei_conta_api)
 from ..api.controlei_derivados_api import api as controlei_derivados_api
@@ -26,6 +26,7 @@ from ..api.controlei_transferencia_api import (
     api as controlei_transferencia_api)
 from ..api.controlei_cofre_api import api as controlei_cofre_api
 from ..api.controlei_lancamento_api import api as controlei_lancamento_api
+from ..api.controlei_orcamento_api import api as controlei_orcamento_api
 from ..api.controlei_importacao_api import api as controlei_importacao_api
 from ..api.controlei_telegram_api import api as controlei_telegram_api
 from ..api.login_api import api as login_api
@@ -42,6 +43,12 @@ API_DESCRIPTION = 'API para monitorar minha vida financeira'
 # Registra os Blue Prints
 # ---------------------------->>
 bp = Blueprint(BLUE_PRINT_NAME, __name__, url_prefix=BLUE_PRINT_URL_PREFIX)
+
+# ----------------------------->>
+# Segurança: guarda global de auth (ver controlei/util/controlei_auth_guard)
+# ----------------------------->>
+registrar_guarda(bp, BLUE_PRINT_URL_PREFIX)
+
 
 # ----------------------------->>
 # Registra Handler After Request
@@ -70,14 +77,30 @@ def handler_custom_error(err):
 # ---------------------------->>
 
 
+_AUTORIZACOES_SWAGGER = {
+    'Bearer': {
+        'type': 'apiKey',
+        'in': 'header',
+        'name': 'Authorization',
+        'description': (
+            "Cole: Bearer <token>  "
+            "(o token vem na resposta do POST /login)"),
+    }
+}
+
+# Swagger: ativo por padrão; para desligar em produção, setar a env
+# SWAGGER_ATIVO=0 (as rotas continuam funcionando, só a doc some).
+_DOC = '/' if os.environ.get('SWAGGER_ATIVO', '1') == '1' else False
+
 api = Api(bp, version=API_VERSION, base_url=BLUE_PRINT_BASE_URL,
-          title=API_TITLE, description=API_DESCRIPTION)
+          title=API_TITLE, description=API_DESCRIPTION, doc=_DOC,
+          authorizations=_AUTORIZACOES_SWAGGER, security='Bearer')
 
 # ---------------------------->>
 # Registra as namespaces da API
 # ---------------------------->>
-api.add_namespace(controlei_health_check_api)
 api.add_namespace(controlei_fatura_api)
+api.add_namespace(controlei_telegram_api)
 api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
 api.add_namespace(controlei_cartao_api)
@@ -91,9 +114,8 @@ api.add_namespace(controlei_instituicao_api)
 api.add_namespace(controlei_lancamento_api)
 api.add_namespace(controlei_cofre_api)
 api.add_namespace(controlei_transferencia_api)
-api.add_namespace(controlei_importacao_api)
 api.add_namespace(controlei_orcamento_api)
-api.add_namespace(controlei_telegram_api)
+api.add_namespace(controlei_importacao_api)
 api.add_namespace(login_api)
 # ---------------------------->>
 # Inicializa a aplicação
