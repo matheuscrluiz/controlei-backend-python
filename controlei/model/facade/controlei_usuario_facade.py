@@ -4,6 +4,7 @@ from ...util.exceptions import FacadeException
 from ...util.util import convert_unique_dic_to_arrayDict
 from ...util.controlei_telegram import (
     enviar_telegram, montar_link_vinculo)
+from ...util.controlei_seed_padroes import CATEGORIAS_PADRAO
 from ..dao.controlei_usuario_dao import ControleiUserDAO
 
 
@@ -52,6 +53,11 @@ class ControleiUserFacade():
             }
 
             user_id = self.dao.insert_usuario(parms)
+
+            # Semeia as categorias padrão do usuário novo NA MESMA transação
+            # (mesma conexão do DAO) — commit único abaixo cobre os dois.
+            self.dao.insert_categorias_padrao(user_id, CATEGORIAS_PADRAO)
+
             self.dao.database_commit()
 
             return user_id

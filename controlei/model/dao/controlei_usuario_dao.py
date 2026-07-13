@@ -247,6 +247,29 @@ class ControleiUserDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def insert_categorias_padrao(self, id_usuario: int, categorias: list):
+        """Insere as categorias padrão do usuário novo NA MESMA conexão do
+        insert_usuario (mesma transação) — não faz commit; o facade dá um
+        commit só, pra usuário + categorias entrarem juntos ou nada entrar."""
+        rotina = 'insert_categorias_padrao'
+
+        try:
+            cmdSql = """
+                INSERT INTO categoria (id_usuario, dsc_categoria,
+                    id_tipo_categoria)
+                VALUES (%(id_usuario)s, %(dsc_categoria)s,
+                    %(id_tipo_categoria)s)
+            """
+            for (dsc, id_tipo) in categorias:
+                self.execute_dml_command_parms(cmdSql, {
+                    "id_usuario": id_usuario,
+                    "dsc_categoria": dsc,
+                    "id_tipo_categoria": id_tipo,
+                })
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def delete_usuario(self, id_usuario: int):
         rotina = 'delete_usuario'
 

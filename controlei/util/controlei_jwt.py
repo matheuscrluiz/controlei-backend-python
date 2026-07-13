@@ -72,3 +72,62 @@ def validar_token(token: str):
 
     except Exception:
         return None
+
+
+# --------------------------------------------------------------------------
+# Token de SERVIÇO (ex.: Power BI): leitor universal, somente GET.
+# Assinado com um segredo PRÓPRIO (JWT_SERVICE_SECRET) para poder ser
+# revogado (trocando só esse segredo) sem derrubar as sessões dos usuários.
+# --------------------------------------------------------------------------
+
+ESCOPO_SERVICO = "leitura_total"
+
+
+def gerar_token_servico(descricao: str = "powerbi",
+                        dias: int = 365) -> str:
+    secret = os.environ.get("JWT_SERVICE_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "JWT_SERVICE_SECRET não configurado no ambiente do backend")
+
+    header = _b64e(json.dumps(
+        {"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+    payload = _b64e(json.dumps({
+        "escopo": ESCOPO_SERVICO,
+        "desc": descricao,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + dias * 86400,
+    }, separators=(",", ":")).encode())
+
+    msg = f"{header}.{payload}".encode()
+    assinatura = _b64e(
+        hmac.new(secret.encode(), msg, hashlib.sha256).digest())
+
+    return f"{header}.{payload}.{assinatura}"
+
+
+def validar_token_servico(token: str) -> bool:
+    """True se for um token de serviço válido (assinatura pelo segredo
+    próprio, escopo correto e não expirado). Fail-closed."""
+    secret = os.environ.get("JWT_SERVICE_SECRET")
+    if not secret or not token:
+        return False
+
+    try:
+        header_b64, payload_b64, sig_b64 = token.split(".")
+        msg = f"{header_b64}.{payload_b64}".encode()
+        esperada = hmac.new(secret.encode(), msg, hashlib.sha256).digest()
+
+        if not hmac.compare_digest(esperada, _b64d(sig_b64)):
+            return False
+
+        payload = json.loads(_b64d(payload_b64))
+        if payload.get("escopo") != ESCOPO_SERVICO:
+            return False
+        if int(payload.get("exp", 0)) < time.time():
+            return False
+
+        return True
+
+    except Exception:
+        return False
