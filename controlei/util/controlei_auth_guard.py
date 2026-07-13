@@ -15,7 +15,7 @@ from flask import request, g, jsonify
 
 from .util import get_dict_retorno_endpoint
 from .constants import TIP_RETORNO_ERROR
-from .controlei_jwt import validar_token
+from .controlei_jwt import validar_token, validar_token_servico
 from .controlei_rate_limit import permitido
 
 # Rotas públicas (comparadas por sufixo do path). As de cron e o webhook
@@ -157,6 +157,19 @@ def registrar_guarda(bp, prefixo: str):
             return _limitar_login()
 
         if _eh_rota_publica(prefixo):
+            return None
+
+        # Token de SERVIÇO (Power BI): leitor universal, somente GET.
+        # Reconhecido antes do fluxo normal; quando presente e válido,
+        # libera qualquer id_usuario mas restringe a métodos de leitura.
+        auth = request.headers.get('Authorization', '')
+        token_bruto = auth[7:].strip() if auth.startswith('Bearer ') else None
+        if token_bruto and validar_token_servico(token_bruto):
+            if request.method != 'GET':
+                return _negar(
+                    'Token de serviço permite apenas leitura (GET)', 403)
+            # Leitura liberada para qualquer usuário: pula o anti-IDOR.
+            g.token_servico = True
             return None
 
         id_usuario_token = _autenticar()
