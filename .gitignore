@@ -143,4 +143,4 @@ cython_debug/
 *.bat
 controlei/*.bat
 controlei/run_dsv.bat
-
+controlei/util/gerar_token*.py
