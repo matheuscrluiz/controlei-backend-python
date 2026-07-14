@@ -194,6 +194,36 @@ class ControleiUserFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
+    def obter_primeiros_passos(self, id_usuario) -> dict:
+        rotina = 'obter_primeiros_passos'
+
+        try:
+            passos = self.dao.get_primeiros_passos(id_usuario)
+            return convert_unique_dic_to_arrayDict(passos)
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def marcar_walkthrough_visto(self, id_usuario):
+        rotina = 'marcar_walkthrough_visto'
+
+        try:
+            self.dao.set_flag_usuario(id_usuario, 'walkthrough_visto', True)
+            self.dao.database_commit()
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def ocultar_checklist(self, id_usuario):
+        rotina = 'ocultar_checklist'
+
+        try:
+            self.dao.set_flag_usuario(id_usuario, 'checklist_oculto', True)
+            self.dao.database_commit()
+
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def deletar_usuario(self, id_usuario: int):
         rotina = 'deletar_usuario'
 
