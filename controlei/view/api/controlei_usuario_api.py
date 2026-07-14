@@ -128,6 +128,53 @@ class UsuarioPreferencias(Resource):
         )
 
 
+model_passos = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+)
+
+
+@api.route('/primeiros-passos')
+class UsuarioPrimeirosPassos(Resource):
+    @api.expect(model_passos, validate=True)
+    def get(self):
+        """Status do checklist de primeiros passos (dados reais)."""
+        id_usuario = request.args.get('id_usuario')
+        result = user_f().obter_primeiros_passos(id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, result)
+        )
+
+
+@api.route('/walkthrough-visto')
+class UsuarioWalkthrough(Resource):
+    @api.expect(model_passos, validate=True)
+    def post(self):
+        """Marca que o usuário já viu o tour de boas-vindas."""
+        id_usuario = request.args.get('id_usuario')
+        user_f().marcar_walkthrough_visto(id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, None)
+        )
+
+
+@api.route('/checklist-ocultar')
+class UsuarioChecklistOcultar(Resource):
+    @api.expect(model_passos, validate=True)
+    def post(self):
+        """Oculta o checklist de primeiros passos do dashboard."""
+        id_usuario = request.args.get('id_usuario')
+        user_f().ocultar_checklist(id_usuario)
+
+        return jsonify(
+            get_dict_retorno_endpoint(
+                TIP_RETORNO_SUCESS, MSG_SUCESSO, None)
+        )
+
+
 model_tg_link = api.parser().add_argument(
     name='id_usuario', type=int, required=True, help="ID do usuário"
 )
