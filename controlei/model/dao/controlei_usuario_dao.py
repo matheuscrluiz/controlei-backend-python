@@ -137,7 +137,8 @@ class ControleiUserDAO(base.DAOBase):
                        notif_avencer_ativa, notif_vencida_ativa,
                        notif_email_destino,
                        notif_telegram_ativo,
-                       (telegram_chat_id IS NOT NULL) AS telegram_vinculado
+                       (telegram_chat_id IS NOT NULL) AS telegram_vinculado,
+                       walkthrough_visto, checklist_oculto
                 from usuario
                 where id_usuario = %(id_usuario)s
             """
@@ -243,6 +244,53 @@ class ControleiUserDAO(base.DAOBase):
             """
             self.execute_dml_command_parms(
                 cmdSql, {'id_usuario': id_usuario})
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_primeiros_passos(self, id_usuario: int) -> dict:
+        """Status do checklist calculado dos DADOS REAIS do usuário."""
+        rotina = 'get_primeiros_passos'
+
+        try:
+            query = """
+                SELECT
+                  EXISTS (SELECT 1 FROM cartao ca
+                          JOIN conta co ON co.id_conta = ca.id_conta
+                          WHERE co.id_usuario = %(id)s)  AS tem_cartao,
+                  EXISTS (SELECT 1 FROM compra cp
+                          JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                          JOIN conta co ON co.id_conta = ca.id_conta
+                          WHERE co.id_usuario = %(id)s)  AS tem_compra,
+                  EXISTS (SELECT 1 FROM orcamento o
+                          WHERE o.id_usuario = %(id)s)   AS tem_orcamento,
+                  EXISTS (SELECT 1 FROM usuario u
+                          WHERE u.id_usuario = %(id)s
+                            AND u.telegram_chat_id IS NOT NULL
+                            AND u.notif_telegram_ativo)  AS telegram_ativo
+            """
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(),
+                params={'id': id_usuario})
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def set_flag_usuario(self, id_usuario: int, campo: str, valor: bool):
+        """Liga/desliga flags simples do usuário (whitelist de colunas)."""
+        rotina = 'set_flag_usuario'
+
+        if campo not in ('walkthrough_visto', 'checklist_oculto'):
+            raise DAOException(__file__, rotina, f'Campo inválido: {campo}')
+
+        try:
+            cmdSql = f"""
+                UPDATE usuario SET {campo} = %(valor)s
+                WHERE id_usuario = %(id_usuario)s
+            """
+            self.execute_dml_command_parms(
+                cmdSql, {'id_usuario': id_usuario, 'valor': valor})
 
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
