@@ -28,6 +28,7 @@ ROTAS_PUBLICAS = (
     '/notificar',
     '/gerar-todas',
     '/swagger.json',
+    '/controlei-health-check',
 )
 
 
