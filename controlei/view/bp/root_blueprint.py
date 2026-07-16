@@ -7,6 +7,7 @@ from controlei.util.custom_http_messages import (
 from controlei.util.controlei_auth_guard import registrar_guarda
 
 from ...util.constants import BLUE_PRINT_BASE_URL
+from ..api.controlei_health_check_api import api as controlei_health_check_api
 from ..api.controlei_fatura_api import api as controlei_fatura_api
 from ..api.controlei_cartao_api import api as controlei_cartao_api
 from ..api.controlei_usuario_api import api as controlei_usuario_api
@@ -83,8 +84,7 @@ _AUTORIZACOES_SWAGGER = {
         'in': 'header',
         'name': 'Authorization',
         'description': (
-            "Cole: Bearer <token>  "
-            "(o token vem na resposta do POST /login)"),
+            "Cole: Bearer <token>"),
     }
 }
 
@@ -99,6 +99,7 @@ api = Api(bp, version=API_VERSION, base_url=BLUE_PRINT_BASE_URL,
 # ---------------------------->>
 # Registra as namespaces da API
 # ---------------------------->>
+api.add_namespace(controlei_health_check_api)
 api.add_namespace(controlei_fatura_api)
 api.add_namespace(controlei_telegram_api)
 api.add_namespace(controlei_usuario_api)
