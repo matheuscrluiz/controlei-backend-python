@@ -1,13 +1,6 @@
 # coding: utf-8
+import math
 import os
-from controlei.util.exceptions import DAOException
-from ...util.constants import (
-    DATABASE_HOST,
-    DATABASE_PASSWORD,
-    DATABASE_USERNAME,
-    DATABASE_NAME,
-    DATABASE_PORT
-)
 import psycopg2
 import pandas as pd
 from dotenv import load_dotenv
@@ -58,25 +51,18 @@ class DAOBase:
 
         for col in df.columns:
             if pd.api.types.is_datetime64_any_dtype(df[col]):
-                # 1️⃣ força para object
-                df[col] = df[col].astype(object)
-
-                # 2️⃣ NaT -> None
-                df[col] = df[col].where(pd.notna(df[col]), None)
-
-                # 3️⃣ datetime -> ISO string
+                df[col] = df[col].astype(object).where(pd.notna(df[col]), None)
                 df[col] = df[col].apply(
-                    lambda x: x.isoformat() if x is not None else None
-                )
-            else:
-                # 🔧 ADD: força float para object (mantém resto igual)
-                if pd.api.types.is_float_dtype(df[col]):
-                    df[col] = df[col].astype(object)
+                    lambda x: x.isoformat() if x is not None else None)
 
-                # outras colunas
-                df[col] = df[col].where(pd.notnull(df[col]), None)
+        records = df.to_dict(orient="records")
 
-        return df.to_dict(orient="records")
+        # sweep final: NaN/Inf remanescente (inclusive object misto) -> None
+        for row in records:
+            for k, v in row.items():
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    row[k] = None
+        return records
 
     # ------------------------------------------------------------------
 
