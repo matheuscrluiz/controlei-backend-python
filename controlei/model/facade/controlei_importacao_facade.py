@@ -126,6 +126,9 @@ class ControleiImportacaoFacade():
                         'duplicada': duplicada,
                         'id_categoria': sugerida,
                         'confianca': c.get('confianca'),
+                        # PDF Itaú: "02/12" na descrição vira parcela
+                        'parcela_atual': c.get('parcela_atual'),
+                        'parcela_total': c.get('parcela_total'),
                         'selecionar': eh_compra and not duplicada,
                     })
                 else:
@@ -229,10 +232,19 @@ class ControleiImportacaoFacade():
                     puladas += 1
                     continue
 
+                # Fatura importada já traz só a parcela DESTE mês (ex.:
+                # "MEB FITNESS 2/12" = R$ 239). Criamos 1 parcela com esse
+                # valor — as próximas virão nas próximas faturas importadas.
+                # Gerar as 12 aqui duplicaria. A parcela vai pra descrição.
+                desc = it.get('descricao') or ''
+                pa, pt = it.get('parcela_atual'), it.get('parcela_total')
+                if pa and pt:
+                    desc = f"{desc} ({pa}/{pt})"
+
                 self.compra_facade.criar_compra({
                     'id_cartao': id_cartao,
                     'id_categoria': it.get('id_categoria'),
-                    'dsc_compra': it.get('descricao'),
+                    'dsc_compra': desc,
                     'valor_total': it.get('valor'),
                     'data_compra': it.get('data'),
                     'num_parcelas': 1,
