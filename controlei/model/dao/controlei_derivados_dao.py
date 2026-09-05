@@ -123,13 +123,78 @@ class ControleiDerivadosDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def get_recentes(self, id_usuario: int, limite: int = 15) -> dict:
+        """
+        Últimas movimentações do usuário, UNIFICADAS: compras no cartão e
+        lançamentos em conta (receita/despesa), ordenadas da mais recente.
+        Alimenta o card "Últimos registros" do dashboard — o lugar de
+        conferir/corrigir o que acabou de ser registrado.
+        """
+        rotina = 'get_recentes'
+
+        try:
+            query = """
+                SELECT * FROM (
+                    SELECT
+                        'compra'            AS origem,
+                        cp.id_compra        AS id_registro,
+                        cp.dsc_compra       AS descricao,
+                        cp.valor_total      AS valor,
+                        cp.data_compra      AS data,
+                        'despesa'           AS natureza,
+                        cp.num_parcelas     AS num_parcelas,
+                        ca.apelido          AS conta_ou_cartao,
+                        cp.id_cartao        AS id_cartao,
+                        NULL::integer       AS id_conta,
+                        cat.dsc_categoria   AS dsc_categoria,
+                        cp.cancelada        AS cancelada
+                    FROM compra cp
+                    JOIN cartao ca   ON ca.id_cartao = cp.id_cartao
+                    JOIN conta co    ON co.id_conta = ca.id_conta
+                    LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND cp.cancelada = false
+
+                    UNION ALL
+
+                    SELECT
+                        'lancamento'        AS origem,
+                        l.id_lancamento     AS id_registro,
+                        l.descricao         AS descricao,
+                        ABS(l.valor)        AS valor,
+                        l.data              AS data,
+                        l.natureza          AS natureza,
+                        NULL::integer       AS num_parcelas,
+                        co.apelido          AS conta_ou_cartao,
+                        NULL::integer       AS id_cartao,
+                        l.id_conta          AS id_conta,
+                        cat.dsc_categoria   AS dsc_categoria,
+                        false               AS cancelada
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND l.natureza IN ('receita', 'despesa')
+                      AND l.status = 'efetivado'
+                ) t
+                ORDER BY t.data DESC, t.id_registro DESC
+                LIMIT %(limite)s
+            """
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(),
+                params={'id_usuario': id_usuario, 'limite': limite})
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def get_fluxo_mensal(
             self, id_usuario: int, competencia: str = None) -> dict:
+        rotina = 'get_fluxo_mensal'
         """
         Receitas, despesas e resultado por mês. REGRA DE OURO: só receita e
         despesa entram; transferência e ajuste ficam de fora.
         """
-        rotina = 'get_fluxo_mensal'
 
         try:
             query = """
@@ -160,7 +225,7 @@ class ControleiDerivadosDAO(base.DAOBase):
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
-            raise DAOException(__file__, 'get_fluxo_mensal', erro)
+            raise DAOException(__file__, rotina, erro)
 
     def get_despesas_por_categoria(
             self, id_usuario: int, data_inicio: str, data_fim: str) -> dict:

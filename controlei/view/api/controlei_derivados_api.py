@@ -11,7 +11,8 @@ from ...model.facade.controlei_derivados_facade import (
 # ---------------------------->>
 
 api = Namespace('controlei-derivados',
-                description='Leituras derivadas (saldo, dívida, fluxo, patrimônio)')
+                description='Leituras derivadas'
+                ' (saldo, dívida, fluxo, patrimônio)')
 
 
 # ---------------------------->>
@@ -93,6 +94,24 @@ class Divida(Resource):
             id_usuario=request.args.get('id_usuario'))
         return jsonify(get_dict_retorno_endpoint(
             TIP_RETORNO_SUCESS, MSG_SUCESSO, {'divida': result}))
+
+
+p_recentes = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+).add_argument(
+    name='limite', type=int, help="Quantidade (padrão 15)")
+
+
+@api.route('/recentes')
+class Recentes(Resource):
+    @api.expect(p_recentes, validate=True)
+    def get(self):
+        """Últimas movimentações unificadas (compras + lançamentos)"""
+        result = deriv_f().recentes(
+            request.args.get('id_usuario'),
+            request.args.get('limite'))
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 
 
 @api.route('/fluxo')
