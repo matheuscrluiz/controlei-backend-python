@@ -123,6 +123,180 @@ class ControleiDerivadosDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def upsert_patrimonio_snapshot(self, id_usuario: int):
+        """
+        Grava (ou atualiza) a posição de HOJE do usuário em patrimonio_snapshot,
+        usando a MESMA fórmula do get_patrimonio — o snapshot reflete
+        exatamente o que o dashboard mostra. Idempotente por dia (UPSERT).
+        """
+        rotina = 'upsert_patrimonio_snapshot'
+
+        try:
+            cmdSql = """
+                INSERT INTO patrimonio_snapshot
+                    (id_usuario, data, saldos, cofres, divida_cartao, patrimonio)
+                SELECT
+                    %(id_usuario)s, CURRENT_DATE,
+                    s.saldos, s.cofres, s.divida,
+                    (s.saldos + s.cofres - s.divida)
+                FROM (
+                    SELECT
+                        (SELECT COALESCE(SUM(l.valor), 0)
+                         FROM lancamento l
+                         JOIN conta co ON co.id_conta = l.id_conta
+                         WHERE co.id_usuario = %(id_usuario)s
+                           AND l.status = 'efetivado') AS saldos,
+
+                        (SELECT COALESCE(SUM(COALESCE(
+                             cf.valor_atual_inform,
+                             COALESCE((
+                                 SELECT SUM(CASE WHEN m.tipo = 'aporte'
+                                                 THEN m.valor ELSE -m.valor END)
+                                 FROM cofre_movimentacao m
+                                 WHERE m.id_cofre = cf.id_cofre), 0))), 0)
+                         FROM cofre cf
+                         JOIN conta co ON co.id_conta = cf.id_conta
+                         WHERE co.id_usuario = %(id_usuario)s) AS cofres,
+
+                        (SELECT COALESCE(SUM(
+                             COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                                       WHERE p.id_fatura = f.id_fatura), 0)
+                           + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
+                                       WHERE i.id_fatura = f.id_fatura), 0)), 0)
+                         FROM fatura f
+                         JOIN cartao ca ON ca.id_cartao = f.id_cartao
+                         JOIN conta  co ON co.id_conta  = ca.id_conta
+                         WHERE co.id_usuario = %(id_usuario)s
+                           AND f.status <> 'paga') AS divida
+                ) s
+                ON CONFLICT (id_usuario, data) DO UPDATE SET
+                    saldos        = EXCLUDED.saldos,
+                    cofres        = EXCLUDED.cofres,
+                    divida_cartao = EXCLUDED.divida_cartao,
+                    patrimonio    = EXCLUDED.patrimonio
+            """
+            self.execute_dml_command_parms(cmdSql, {'id_usuario': id_usuario})
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_patrimonio_historico(self, id_usuario: int, dias: int = 180) -> dict:
+        """Série de snapshots dos últimos N dias (mais antigo primeiro)."""
+        rotina = 'get_patrimonio_historico'
+
+        try:
+            query = """
+                SELECT data, saldos, cofres, divida_cartao, patrimonio
+                FROM patrimonio_snapshot
+                WHERE id_usuario = %(id_usuario)s
+                  AND data >= CURRENT_DATE - (%(dias)s || ' days')::interval
+                ORDER BY data
+            """
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(),
+                params={'id_usuario': id_usuario, 'dias': dias})
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_ids_usuarios(self) -> dict:
+        """Todos os usuários (pro cron gravar o snapshot de cada um)."""
+        rotina = 'get_ids_usuarios'
+        try:
+            dataframe = pd.read_sql(
+                sql="SELECT id_usuario FROM usuario ORDER BY id_usuario",
+                con=self.get_connection())
+            return self.convert_dataframe_to_dict(dataframe)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_projecao(self, id_usuario: int) -> dict:
+        """
+        Projeção de saldo até o FIM DO MÊS CORRENTE:
+          saldo_atual
+          + receitas previstas  (recorrências de receita em conta, ativas,
+                                 com dia_do_mes ainda por vir e ainda não
+                                 geradas neste mês)
+          - despesas previstas  (idem, natureza despesa, em conta)
+          - faturas a vencer    (faturas não pagas com vencimento até o fim
+                                 do mês)
+          = saldo_projetado
+        Devolve também o detalhamento de cada parcela do cálculo.
+        Recorrências de CARTÃO não entram (viram compra → já estão na fatura).
+        """
+        rotina = 'get_projecao'
+
+        try:
+            query = """
+                WITH saldo AS (
+                    SELECT COALESCE(SUM(l.valor), 0) AS saldo_atual
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND l.status = 'efetivado'
+                ),
+                rec AS (
+                    SELECT r.id_recorrencia, r.dsc_recorrencia, r.natureza,
+                           r.valor, r.dia_do_mes
+                    FROM recorrencia r
+                    WHERE r.id_usuario = %(id_usuario)s
+                      AND r.ativa = true
+                      AND r.id_conta IS NOT NULL
+                      AND r.id_cartao IS NULL
+                      AND r.natureza IN ('receita', 'despesa')
+                      AND r.dia_do_mes > EXTRACT(DAY FROM CURRENT_DATE)
+                      AND NOT EXISTS (
+                            SELECT 1 FROM lancamento l2
+                            WHERE l2.id_recorrencia = r.id_recorrencia
+                              AND date_trunc('month', l2.data)
+                                  = date_trunc('month', CURRENT_DATE)
+                      )
+                ),
+                fat AS (
+                    SELECT f.id_fatura, ca.apelido, co.apelido AS apelido_conta,
+                           ca.ultimos4, f.data_vencimento,
+                           COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                                     WHERE p.id_fatura = f.id_fatura), 0)
+                         + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
+                                     WHERE i.id_fatura = f.id_fatura), 0)
+                           AS valor
+                    FROM fatura f
+                    JOIN cartao ca ON ca.id_cartao = f.id_cartao
+                    JOIN conta co ON co.id_conta = ca.id_conta
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND f.status <> 'paga'
+                      -- inclui VENCIDAS não pagas (dinheiro que vai sair,
+                      -- só que atrasado) e as que vencem até o fim do mês
+                      AND f.data_vencimento <= (date_trunc('month', CURRENT_DATE)
+                                                + interval '1 month - 1 day')::date
+                )
+                SELECT
+                    (SELECT saldo_atual FROM saldo) AS saldo_atual,
+                    COALESCE((SELECT SUM(valor) FROM rec
+                              WHERE natureza = 'receita'), 0) AS receitas_previstas,
+                    COALESCE((SELECT SUM(valor) FROM rec
+                              WHERE natureza = 'despesa'), 0) AS despesas_previstas,
+                    COALESCE((SELECT SUM(valor) FROM fat), 0) AS faturas_a_vencer,
+                    COALESCE((SELECT json_agg(json_build_object(
+                        'descricao', dsc_recorrencia, 'natureza', natureza,
+                        'valor', valor, 'dia', dia_do_mes)
+                        ORDER BY dia_do_mes) FROM rec), '[]'::json) AS recorrencias,
+                    COALESCE((SELECT json_agg(json_build_object(
+                        'descricao', apelido, 'conta', apelido_conta,
+                        'ultimos4', ultimos4,
+                        'vencimento', data_vencimento, 'valor', valor,
+                        'atrasada', (data_vencimento < CURRENT_DATE))
+                        ORDER BY data_vencimento) FROM fat), '[]'::json) AS faturas
+            """
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(),
+                params={'id_usuario': id_usuario})
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def get_recentes(self, id_usuario: int, limite: int = 15) -> dict:
         """
         Últimas movimentações do usuário, UNIFICADAS: compras no cartão e
@@ -190,11 +364,11 @@ class ControleiDerivadosDAO(base.DAOBase):
 
     def get_fluxo_mensal(
             self, id_usuario: int, competencia: str = None) -> dict:
-        rotina = 'get_fluxo_mensal'
         """
         Receitas, despesas e resultado por mês. REGRA DE OURO: só receita e
         despesa entram; transferência e ajuste ficam de fora.
         """
+        rotina = 'get_fluxo_mensal'
 
         try:
             query = """
@@ -225,7 +399,7 @@ class ControleiDerivadosDAO(base.DAOBase):
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
-            raise DAOException(__file__, rotina, erro)
+            raise DAOException(__file__, 'get_fluxo_mensal', erro)
 
     def get_despesas_por_categoria(
             self, id_usuario: int, data_inicio: str, data_fim: str) -> dict:
