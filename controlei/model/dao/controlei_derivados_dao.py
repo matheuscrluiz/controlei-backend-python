@@ -125,7 +125,8 @@ class ControleiDerivadosDAO(base.DAOBase):
 
     def upsert_patrimonio_snapshot(self, id_usuario: int):
         """
-        Grava (ou atualiza) a posição de HOJE do usuário em patrimonio_snapshot,
+        Grava (ou atualiza) a posição de HOJE do usuário
+          em patrimonio_snapshot,
         usando a MESMA fórmula do get_patrimonio — o snapshot reflete
         exatamente o que o dashboard mostra. Idempotente por dia (UPSERT).
         """
@@ -134,7 +135,8 @@ class ControleiDerivadosDAO(base.DAOBase):
         try:
             cmdSql = """
                 INSERT INTO patrimonio_snapshot
-                    (id_usuario, data, saldos, cofres, divida_cartao, patrimonio)
+                    (id_usuario, data, saldos,
+                      cofres, divida_cartao, patrimonio)
                 SELECT
                     %(id_usuario)s, CURRENT_DATE,
                     s.saldos, s.cofres, s.divida,
@@ -151,7 +153,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                              cf.valor_atual_inform,
                              COALESCE((
                                  SELECT SUM(CASE WHEN m.tipo = 'aporte'
-                                                 THEN m.valor ELSE -m.valor END)
+                                                 THEN m.valor
+                                                   ELSE -m.valor END)
                                  FROM cofre_movimentacao m
                                  WHERE m.id_cofre = cf.id_cofre), 0))), 0)
                          FROM cofre cf
@@ -159,7 +162,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                          WHERE co.id_usuario = %(id_usuario)s) AS cofres,
 
                         (SELECT COALESCE(SUM(
-                             COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                             COALESCE((SELECT SUM(p.valor_parcela)
+                               FROM parcela p
                                        WHERE p.id_fatura = f.id_fatura), 0)
                            + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
                                        WHERE i.id_fatura = f.id_fatura), 0)), 0)
@@ -180,7 +184,8 @@ class ControleiDerivadosDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def get_patrimonio_historico(self, id_usuario: int, dias: int = 180) -> dict:
+    def get_patrimonio_historico(
+            self, id_usuario: int, dias: int = 180) -> dict:
         """Série de snapshots dos últimos N dias (mais antigo primeiro)."""
         rotina = 'get_patrimonio_historico'
 
@@ -254,7 +259,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                       )
                 ),
                 fat AS (
-                    SELECT f.id_fatura, ca.apelido, co.apelido AS apelido_conta,
+                    SELECT f.id_fatura, ca.apelido,
+                      co.apelido AS apelido_conta,
                            ca.ultimos4, f.data_vencimento,
                            COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
                                      WHERE p.id_fatura = f.id_fatura), 0)
@@ -320,12 +326,14 @@ class ControleiDerivadosDAO(base.DAOBase):
                         ca.apelido          AS conta_ou_cartao,
                         cp.id_cartao        AS id_cartao,
                         NULL::integer       AS id_conta,
+                        cp.id_categoria     AS id_categoria,
                         cat.dsc_categoria   AS dsc_categoria,
                         cp.cancelada        AS cancelada
                     FROM compra cp
                     JOIN cartao ca   ON ca.id_cartao = cp.id_cartao
                     JOIN conta co    ON co.id_conta = ca.id_conta
-                    LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
+                    LEFT JOIN categoria cat
+                        ON cat.id_categoria = cp.id_categoria
                     WHERE co.id_usuario = %(id_usuario)s
                       AND cp.cancelada = false
 
@@ -342,11 +350,13 @@ class ControleiDerivadosDAO(base.DAOBase):
                         co.apelido          AS conta_ou_cartao,
                         NULL::integer       AS id_cartao,
                         l.id_conta          AS id_conta,
+                        l.id_categoria      AS id_categoria,
                         cat.dsc_categoria   AS dsc_categoria,
                         false               AS cancelada
                     FROM lancamento l
                     JOIN conta co ON co.id_conta = l.id_conta
-                    LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
+                    LEFT JOIN categoria cat
+                      ON cat.id_categoria = l.id_categoria
                     WHERE co.id_usuario = %(id_usuario)s
                       AND l.natureza IN ('receita', 'despesa')
                       AND l.status = 'efetivado'
@@ -399,7 +409,7 @@ class ControleiDerivadosDAO(base.DAOBase):
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
-            raise DAOException(__file__, 'get_fluxo_mensal', erro)
+            raise DAOException(__file__, rotina, erro)
 
     def get_despesas_por_categoria(
             self, id_usuario: int, data_inicio: str, data_fim: str) -> dict:
@@ -484,7 +494,8 @@ class ControleiDerivadosDAO(base.DAOBase):
             raise DAOException(__file__, rotina, erro)
 
     def get_patrimonio_usuario(self, id_usuario: int) -> dict:
-        """Patrimônio líquido = saldos + valor dos cofres - dívida de cartão."""
+        """Patrimônio líquido = saldos + valor dos cofres
+          - dívida de cartão."""
         rotina = 'get_patrimonio_usuario'
 
         try:
@@ -506,7 +517,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                              cf.valor_atual_inform,
                              COALESCE((
                                  SELECT SUM(CASE WHEN m.tipo = 'aporte'
-                                                 THEN m.valor ELSE -m.valor END)
+                                                 THEN m.valor
+                                                   ELSE -m.valor END)
                                  FROM cofre_movimentacao m
                                  WHERE m.id_cofre = cf.id_cofre), 0))), 0)
                          FROM cofre cf
@@ -514,7 +526,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                          WHERE co.id_usuario = %(id_usuario)s) AS cofres,
 
                         (SELECT COALESCE(SUM(
-                             COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                             COALESCE((SELECT SUM(p.valor_parcela)
+                               FROM parcela p
                                        WHERE p.id_fatura = f.id_fatura), 0)
                            + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
                                        WHERE i.id_fatura = f.id_fatura), 0)), 0)

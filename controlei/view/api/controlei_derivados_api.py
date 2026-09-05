@@ -12,7 +12,8 @@ from ...model.facade.controlei_derivados_facade import (
 # ---------------------------->>
 
 api = Namespace('controlei-derivados',
-                description='Leituras derivadas (saldo, dívida, fluxo, patrimônio)')
+                description='Leituras derivadas'
+                ' (saldo, dívida, fluxo, patrimônio)')
 
 
 # ---------------------------->>

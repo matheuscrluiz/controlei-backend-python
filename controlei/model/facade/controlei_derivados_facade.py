@@ -77,7 +77,8 @@ class ControleiDerivadosFacade():
             self.dao.database_commit()
 
             serie = convert_unique_dic_to_arrayDict(
-                self.dao.get_patrimonio_historico(id_usuario, int(dias or 180)))
+                self.dao.get_patrimonio_historico(
+                    id_usuario, int(dias or 180)))
 
             tendencia = None
             if len(serie) >= 2:
@@ -116,7 +117,8 @@ class ControleiDerivadosFacade():
             return parsedate_to_datetime(s).date()
 
     def projecao(self, id_usuario: int):
-        """Saldo projetado = atual + receitas prev. - despesas prev. - faturas."""
+        """Saldo projetado = atual + receitas prev.
+          - despesas prev. - faturas."""
         rotina = 'projecao'
         try:
             dados = convert_unique_dic_to_arrayDict(
