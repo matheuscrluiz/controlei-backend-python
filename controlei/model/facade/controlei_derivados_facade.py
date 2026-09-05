@@ -41,6 +41,14 @@ class ControleiDerivadosFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
+    def recentes(self, id_usuario: int, limite=15):
+        rotina = 'recentes'
+        try:
+            return convert_unique_dic_to_arrayDict(
+                self.dao.get_recentes(id_usuario, int(limite or 15)))
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def fluxo_mensal(self, id_usuario: int, competencia=None):
         rotina = 'fluxo_mensal'
         try:
