@@ -1,3 +1,4 @@
+import os
 from flask import jsonify, request
 from flask_restx import Resource
 from flask_restx.namespace import Namespace
@@ -11,8 +12,7 @@ from ...model.facade.controlei_derivados_facade import (
 # ---------------------------->>
 
 api = Namespace('controlei-derivados',
-                description='Leituras derivadas'
-                ' (saldo, dívida, fluxo, patrimônio)')
+                description='Leituras derivadas (saldo, dívida, fluxo, patrimônio)')
 
 
 # ---------------------------->>
@@ -100,6 +100,57 @@ p_recentes = api.parser().add_argument(
     name='id_usuario', type=int, required=True, help="ID do usuário"
 ).add_argument(
     name='limite', type=int, help="Quantidade (padrão 15)")
+
+
+p_projecao = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário")
+
+
+p_historico = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+).add_argument(
+    name='dias', type=int, help="Janela em dias (padrão 180)")
+
+p_snapshot_cron = api.parser().add_argument(
+    name='X-Cron-Secret', location='headers', required=True,
+    help="Segredo do cron (igual à env CRON_SECRET)")
+
+
+@api.route('/patrimonio-historico')
+class PatrimonioHistorico(Resource):
+    @api.expect(p_historico, validate=True)
+    def get(self):
+        """Série de snapshots do patrimônio + tendência vs. ~30 dias"""
+        result = deriv_f().patrimonio_historico(
+            request.args.get('id_usuario'),
+            request.args.get('dias'))
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
+
+
+@api.route('/snapshot-patrimonio')
+class SnapshotPatrimonioCron(Resource):
+    @api.expect(p_snapshot_cron)
+    def post(self):
+        """Grava o snapshot diário de patrimônio de TODOS os usuários.
+        Uso do cron. Protegido por header X-Cron-Secret == env CRON_SECRET."""
+        segredo = os.environ.get('CRON_SECRET')
+        enviado = request.headers.get('X-Cron-Secret')
+        if not segredo or enviado != segredo:
+            return {'erro': 'Não autorizado'}, 401
+        result = deriv_f().registrar_snapshot_todos()
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
+
+
+@api.route('/projecao')
+class Projecao(Resource):
+    @api.expect(p_projecao, validate=True)
+    def get(self):
+        """Projeção de saldo até o fim do mês (com detalhamento)"""
+        result = deriv_f().projecao(request.args.get('id_usuario'))
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 
 
 @api.route('/recentes')

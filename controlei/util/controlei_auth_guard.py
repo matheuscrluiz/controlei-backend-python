@@ -29,6 +29,7 @@ ROTAS_PUBLICAS = (
     '/gerar-todas',
     '/swagger.json',
     '/controlei-health-check',
+    '/snapshot-patrimonio',      # cron diário (protegido por X-Cron-Secret)
 )
 
 
