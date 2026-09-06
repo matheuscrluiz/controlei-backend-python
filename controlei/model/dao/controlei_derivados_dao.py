@@ -125,8 +125,7 @@ class ControleiDerivadosDAO(base.DAOBase):
 
     def upsert_patrimonio_snapshot(self, id_usuario: int):
         """
-        Grava (ou atualiza) a posição de HOJE do usuário
-          em patrimonio_snapshot,
+        Grava (ou atualiza) a posição de HOJE do usuário em patrimonio_snapshot,
         usando a MESMA fórmula do get_patrimonio — o snapshot reflete
         exatamente o que o dashboard mostra. Idempotente por dia (UPSERT).
         """
@@ -135,8 +134,7 @@ class ControleiDerivadosDAO(base.DAOBase):
         try:
             cmdSql = """
                 INSERT INTO patrimonio_snapshot
-                    (id_usuario, data, saldos,
-                      cofres, divida_cartao, patrimonio)
+                    (id_usuario, data, saldos, cofres, divida_cartao, patrimonio)
                 SELECT
                     %(id_usuario)s, CURRENT_DATE,
                     s.saldos, s.cofres, s.divida,
@@ -153,8 +151,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                              cf.valor_atual_inform,
                              COALESCE((
                                  SELECT SUM(CASE WHEN m.tipo = 'aporte'
-                                                 THEN m.valor
-                                                   ELSE -m.valor END)
+                                                 THEN m.valor ELSE -m.valor END)
                                  FROM cofre_movimentacao m
                                  WHERE m.id_cofre = cf.id_cofre), 0))), 0)
                          FROM cofre cf
@@ -162,8 +159,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                          WHERE co.id_usuario = %(id_usuario)s) AS cofres,
 
                         (SELECT COALESCE(SUM(
-                             COALESCE((SELECT SUM(p.valor_parcela)
-                               FROM parcela p
+                             COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
                                        WHERE p.id_fatura = f.id_fatura), 0)
                            + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
                                        WHERE i.id_fatura = f.id_fatura), 0)), 0)
@@ -184,8 +180,7 @@ class ControleiDerivadosDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def get_patrimonio_historico(
-            self, id_usuario: int, dias: int = 180) -> dict:
+    def get_patrimonio_historico(self, id_usuario: int, dias: int = 180) -> dict:
         """Série de snapshots dos últimos N dias (mais antigo primeiro)."""
         rotina = 'get_patrimonio_historico'
 
@@ -213,6 +208,63 @@ class ControleiDerivadosDAO(base.DAOBase):
                 sql="SELECT id_usuario FROM usuario ORDER BY id_usuario",
                 con=self.get_connection())
             return self.convert_dataframe_to_dict(dataframe)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_cobertura_faturas(self, id_usuario: int) -> dict:
+        """
+        INSIGHT: a fatura vence, mas a CONTA DO CARTÃO (que paga por padrão /
+        débito automático) não tem saldo pra cobrir — mesmo que o patrimônio
+        total seja alto. Compara cada fatura não paga com vencimento até 30
+        dias com o saldo da conta do cartão. Devolve só as descobertas.
+        """
+        rotina = 'get_cobertura_faturas'
+
+        try:
+            query = """
+                WITH saldo_conta AS (
+                    SELECT co.id_conta, co.apelido,
+                           COALESCE(SUM(l.valor), 0) AS saldo
+                    FROM conta co
+                    LEFT JOIN lancamento l
+                           ON l.id_conta = co.id_conta
+                          AND l.status = 'efetivado'
+                    WHERE co.id_usuario = %(id_usuario)s
+                    GROUP BY co.id_conta, co.apelido
+                ),
+                fat AS (
+                    SELECT f.id_fatura, f.data_vencimento, f.status,
+                           ca.id_cartao, ca.apelido AS apelido_cartao,
+                           ca.ultimos4, ca.id_conta,
+                           COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                                     WHERE p.id_fatura = f.id_fatura), 0)
+                         + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
+                                     WHERE i.id_fatura = f.id_fatura), 0)
+                           AS total
+                    FROM fatura f
+                    JOIN cartao ca ON ca.id_cartao = f.id_cartao
+                    JOIN conta co ON co.id_conta = ca.id_conta
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND f.status <> 'paga'
+                      AND f.data_vencimento <= CURRENT_DATE + interval '30 days'
+                )
+                SELECT fat.id_fatura, fat.data_vencimento, fat.status,
+                       fat.id_cartao, fat.apelido_cartao, fat.ultimos4,
+                       fat.total,
+                       sc.id_conta, sc.apelido AS apelido_conta, sc.saldo,
+                       (fat.total - sc.saldo) AS falta,
+                       (fat.data_vencimento < CURRENT_DATE) AS atrasada
+                FROM fat
+                JOIN saldo_conta sc ON sc.id_conta = fat.id_conta
+                WHERE fat.total > 0
+                  AND sc.saldo < fat.total
+                ORDER BY fat.data_vencimento
+            """
+            dataframe = pd.read_sql(
+                sql=query, con=self.get_connection(),
+                params={'id_usuario': id_usuario})
+            return self.convert_dataframe_to_dict(dataframe)
+
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
@@ -259,8 +311,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                       )
                 ),
                 fat AS (
-                    SELECT f.id_fatura, ca.apelido,
-                      co.apelido AS apelido_conta,
+                    SELECT f.id_fatura, ca.apelido, co.apelido AS apelido_conta,
                            ca.ultimos4, f.data_vencimento,
                            COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
                                      WHERE p.id_fatura = f.id_fatura), 0)
@@ -286,7 +337,11 @@ class ControleiDerivadosDAO(base.DAOBase):
                     COALESCE((SELECT SUM(valor) FROM fat), 0) AS faturas_a_vencer,
                     COALESCE((SELECT json_agg(json_build_object(
                         'descricao', dsc_recorrencia, 'natureza', natureza,
-                        'valor', valor, 'dia', dia_do_mes)
+                        'valor', valor, 'dia', dia_do_mes,
+                        -- valor NULL = recorrência de valor variável (conta
+                        -- de luz, seguro reajustado): não dá pra projetar;
+                        -- entra na lista como "a definir", fora da soma
+                        'variavel', (valor IS NULL))
                         ORDER BY dia_do_mes) FROM rec), '[]'::json) AS recorrencias,
                     COALESCE((SELECT json_agg(json_build_object(
                         'descricao', apelido, 'conta', apelido_conta,
@@ -332,8 +387,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                     FROM compra cp
                     JOIN cartao ca   ON ca.id_cartao = cp.id_cartao
                     JOIN conta co    ON co.id_conta = ca.id_conta
-                    LEFT JOIN categoria cat
-                        ON cat.id_categoria = cp.id_categoria
+                    LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
                     WHERE co.id_usuario = %(id_usuario)s
                       AND cp.cancelada = false
 
@@ -355,8 +409,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                         false               AS cancelada
                     FROM lancamento l
                     JOIN conta co ON co.id_conta = l.id_conta
-                    LEFT JOIN categoria cat
-                      ON cat.id_categoria = l.id_categoria
+                    LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
                     WHERE co.id_usuario = %(id_usuario)s
                       AND l.natureza IN ('receita', 'despesa')
                       AND l.status = 'efetivado'
@@ -409,7 +462,7 @@ class ControleiDerivadosDAO(base.DAOBase):
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
-            raise DAOException(__file__, rotina, erro)
+            raise DAOException(__file__, 'get_fluxo_mensal', erro)
 
     def get_despesas_por_categoria(
             self, id_usuario: int, data_inicio: str, data_fim: str) -> dict:
@@ -494,8 +547,7 @@ class ControleiDerivadosDAO(base.DAOBase):
             raise DAOException(__file__, rotina, erro)
 
     def get_patrimonio_usuario(self, id_usuario: int) -> dict:
-        """Patrimônio líquido = saldos + valor dos cofres
-          - dívida de cartão."""
+        """Patrimônio líquido = saldos + valor dos cofres - dívida de cartão."""
         rotina = 'get_patrimonio_usuario'
 
         try:
@@ -517,8 +569,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                              cf.valor_atual_inform,
                              COALESCE((
                                  SELECT SUM(CASE WHEN m.tipo = 'aporte'
-                                                 THEN m.valor
-                                                   ELSE -m.valor END)
+                                                 THEN m.valor ELSE -m.valor END)
                                  FROM cofre_movimentacao m
                                  WHERE m.id_cofre = cf.id_cofre), 0))), 0)
                          FROM cofre cf
@@ -526,8 +577,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                          WHERE co.id_usuario = %(id_usuario)s) AS cofres,
 
                         (SELECT COALESCE(SUM(
-                             COALESCE((SELECT SUM(p.valor_parcela)
-                               FROM parcela p
+                             COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
                                        WHERE p.id_fatura = f.id_fatura), 0)
                            + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
                                        WHERE i.id_fatura = f.id_fatura), 0)), 0)
