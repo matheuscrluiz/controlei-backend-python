@@ -12,8 +12,7 @@ from ...model.facade.controlei_derivados_facade import (
 # ---------------------------->>
 
 api = Namespace('controlei-derivados',
-                description='Leituras derivadas'
-                ' (saldo, dívida, fluxo, patrimônio)')
+                description='Leituras derivadas (saldo, dívida, fluxo, patrimônio)')
 
 
 # ---------------------------->>
@@ -140,6 +139,20 @@ class SnapshotPatrimonioCron(Resource):
         if not segredo or enviado != segredo:
             return {'erro': 'Não autorizado'}, 401
         result = deriv_f().registrar_snapshot_todos()
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
+
+
+p_cobertura = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário")
+
+
+@api.route('/cobertura-faturas')
+class CoberturaFaturas(Resource):
+    @api.expect(p_cobertura, validate=True)
+    def get(self):
+        """Faturas (≤30 dias) cuja conta do cartão não cobre o valor"""
+        result = deriv_f().cobertura_faturas(request.args.get('id_usuario'))
         return jsonify(get_dict_retorno_endpoint(
             TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 
