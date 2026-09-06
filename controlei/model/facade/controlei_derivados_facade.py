@@ -77,8 +77,7 @@ class ControleiDerivadosFacade():
             self.dao.database_commit()
 
             serie = convert_unique_dic_to_arrayDict(
-                self.dao.get_patrimonio_historico(
-                    id_usuario, int(dias or 180)))
+                self.dao.get_patrimonio_historico(id_usuario, int(dias or 180)))
 
             tendencia = None
             if len(serie) >= 2:
@@ -116,9 +115,17 @@ class ControleiDerivadosFacade():
             from email.utils import parsedate_to_datetime
             return parsedate_to_datetime(s).date()
 
+    def cobertura_faturas(self, id_usuario: int):
+        """Faturas cuja conta do cartão não tem saldo pra pagar."""
+        rotina = 'cobertura_faturas'
+        try:
+            return convert_unique_dic_to_arrayDict(
+                self.dao.get_cobertura_faturas(id_usuario))
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def projecao(self, id_usuario: int):
-        """Saldo projetado = atual + receitas prev.
-          - despesas prev. - faturas."""
+        """Saldo projetado = atual + receitas prev. - despesas prev. - faturas."""
         rotina = 'projecao'
         try:
             dados = convert_unique_dic_to_arrayDict(
