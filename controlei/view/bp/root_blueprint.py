@@ -26,6 +26,7 @@ from ..api.controlei_instituicao_api import api as controlei_instituicao_api
 from ..api.controlei_transferencia_api import (
     api as controlei_transferencia_api)
 from ..api.controlei_cofre_api import api as controlei_cofre_api
+from ..api.controlei_beneficio_api import api as controlei_beneficio_api
 from ..api.controlei_lancamento_api import api as controlei_lancamento_api
 from ..api.controlei_orcamento_api import api as controlei_orcamento_api
 from ..api.controlei_importacao_api import api as controlei_importacao_api
@@ -104,6 +105,7 @@ api.add_namespace(controlei_fatura_api)
 api.add_namespace(controlei_telegram_api)
 api.add_namespace(controlei_usuario_api)
 api.add_namespace(controlei_categoria_api)
+api.add_namespace(controlei_beneficio_api)
 api.add_namespace(controlei_cartao_api)
 api.add_namespace(controlei_conta_api)
 api.add_namespace(controlei_derivados_api)
