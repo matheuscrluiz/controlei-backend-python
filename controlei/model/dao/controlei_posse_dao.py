@@ -49,6 +49,17 @@ RESOLVEDORES = {
         FROM cofre cf JOIN conta co ON co.id_conta = cf.id_conta
         WHERE cf.id_cofre = %(id)s
     """,
+    # Benefícios (módulo apartado): dono direto pelo id_usuario.
+    'id_beneficio': """
+        SELECT id_usuario AS dono FROM beneficio
+        WHERE id_beneficio = %(id)s
+    """,
+    'id_beneficio_mov': """
+        SELECT b.id_usuario AS dono
+        FROM beneficio_movimento m
+        JOIN beneficio b ON b.id_beneficio = m.id_beneficio
+        WHERE m.id_beneficio_mov = %(id)s
+    """,
     'id_recorrencia': """
         SELECT COALESCE(co.id_usuario, co2.id_usuario) AS dono
         FROM recorrencia r
