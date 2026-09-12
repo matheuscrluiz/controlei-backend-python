@@ -44,17 +44,13 @@ def _norm(s: str) -> str:
 V_GASTO = ('gastei', 'gasto', 'paguei', 'comprei', 'compra', 'despesa', 'saiu')
 V_RECEITA = ('recebi', 'receita', 'entrou', 'ganhei', 'caiu')
 # coisas que SÃO receita mesmo sem verbo: "2100 de salário", "500 freela"
-N_RECEITA = ('salario', 'salario', 'freela', 'freelance',
-             'reembolso', 'cashback',
-             'decimo terceiro', '13o', 'ferias', 'bonus',
-             'comissao', 'dividendo',
+N_RECEITA = ('salario', 'salario', 'freela', 'freelance', 'reembolso', 'cashback',
+             'decimo terceiro', '13o', 'ferias', 'bonus', 'comissao', 'dividendo',
              'dividendos', 'rendimento', 'rendimentos', 'aluguel recebido',
-             'pix recebido', 'venda', 'vendi',
-             'pagamento recebido', 'restituicao')
+             'pix recebido', 'venda', 'vendi', 'pagamento recebido', 'restituicao')
 V_RECARGA = ('recarga', 'recarreguei', 'recarregou', 'carregou', 'creditou')
 # palavras que indicam benefício (VA/VR/VT) — o destino é o benefício
-V_BENEFICIO = ('vale', 'va', 'vr', 'vt', 'beneficio',
-               'alimentacao', 'refeicao',
+V_BENEFICIO = ('vale', 'va', 'vr', 'vt', 'beneficio', 'alimentacao', 'refeicao',
                'transporte', 'ticket', 'alelo', 'sodexo', 'pluxee', 'flash')
 V_SALDO = ('saldo', 'quanto tenho', 'quanto eu tenho', 'tenho quanto')
 V_GASTOS = ('quanto gastei', 'gastos', 'quanto ja gastei', 'gastei quanto',
@@ -72,8 +68,7 @@ _RELATIVAS = {
     'hoje': 0, 'ontem': 1, 'anteontem': 2,
 }
 
-# destino: "no nubank", "na santander", "em dinheiro",
-#  "pelo cartao", "com o vale"
+# destino: "no nubank", "na santander", "em dinheiro", "pelo cartao", "com o vale"
 _DESTINO_RE = re.compile(
     r'\b(?:no|na|em|pelo|pela|com o|com a|do|da)\s+(.+?)$')
 
@@ -98,8 +93,7 @@ def _parse_data(txt: str, hoje: date):
     """Extrai a data e devolve (date, texto_sem_data)."""
     for palavra, delta in _RELATIVAS.items():
         if re.search(rf'\b{palavra}\b', txt):
-            return hoje - timedelta(
-                days=delta), re.sub(rf'\b{palavra}\b', ' ', txt)
+            return hoje - timedelta(days=delta), re.sub(rf'\b{palavra}\b', ' ', txt)
 
     m = _DATA_RE.search(txt)
     if m:
@@ -122,8 +116,7 @@ def _parse_data(txt: str, hoje: date):
     if m:
         d = int(m.group(1))
         if 1 <= d <= 31:
-            # "dia 5": o dia 5 mais recente (este mês se já passou,
-            #  senão o anterior)
+            # "dia 5": o dia 5 mais recente (este mês se já passou, senão o anterior)
             try:
                 dt = hoje.replace(day=d)
             except ValueError:
@@ -160,8 +153,7 @@ def interpretar(mensagem: str, hoje: date = None) -> dict:
         return out
 
     # ---- consultas (sem valor) ----
-    if _tem(txt, V_AJUDA) or txt in ('oi', 'ola', 'bom dia', 'boa tarde',
-                                     'boa noite'):
+    if _tem(txt, V_AJUDA) or txt in ('oi', 'ola', 'bom dia', 'boa tarde', 'boa noite'):
         out['intencao'] = 'ajuda'
         return out
     if _tem(txt, V_SALDO) and not _VALOR_RE.search(txt):
@@ -209,11 +201,9 @@ def interpretar(mensagem: str, hoje: date = None) -> dict:
         return out
 
     if eh_beneficio:
-        out['intencao'] = 'beneficio_recarga' if eh_recarga \
-            else 'beneficio_gasto'
+        out['intencao'] = 'beneficio_recarga' if eh_recarga else 'beneficio_gasto'
     elif eh_recarga:
-        # "recarga 800" sem dizer vale: assume benefício
-        #  (recarga é coisa de vale)
+        # "recarga 800" sem dizer vale: assume benefício (recarga é coisa de vale)
         out['intencao'] = 'beneficio_recarga'
     elif eh_receita:
         out['intencao'] = 'receita'
@@ -233,5 +223,7 @@ TEXTO_AJUDA = (
     "🔋 <b>recarga 800 vale</b> — recarga do vale\n"
     "📅 pode dizer <b>ontem</b>, <b>dia 5</b> ou <b>05/09</b>\n"
     "🏷 e onde foi: <b>no nubank</b>, <b>no débito</b>\n\n"
-    "Consultas: <b>saldo</b> · <b>quanto gastei</b>"
+    "Consultas: <b>saldo</b> · <b>quanto gastei</b>\n\n"
+    "💡 Eu lembro em qual conta cada coisa caiu da última vez. "
+    "Pra mudar, é só dizer uma vez: <b>salário no nubank</b>."
 )

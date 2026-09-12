@@ -229,6 +229,38 @@ class ControleiTelegramBot:
         if data == 'undo':
             return self._desfazer(chat_id, message_id, callback_id)
 
+        # mudar conta: desfaz o último registro e reabre a escolha
+        if data == 'mudar':
+            ctx = self.ctx.get(chat_id) or {}
+            if ctx.get('ultimo_tipo') != 'lancamento' or not ctx.get('ultimo_id'):
+                return responder_callback(callback_id, "Nada pra mudar.")
+            try:
+                # recupera o lançamento pra reconstruir a pendência
+                r = self.lanc.obter_lancamento(
+                    id_lancamento=int(ctx['ultimo_id']))
+                lanc = r[0] if r else None
+            except Exception:
+                lanc = None
+            if not lanc:
+                return responder_callback(callback_id, "Não achei o registro.")
+            self.lanc.deletar_lancamento(int(ctx['ultimo_id']))
+            self.ctx.limpar_ultimo(chat_id)
+            pend = {
+                'intencao': 'gasto' if lanc.get('natureza') == 'despesa' else 'receita',
+                'valor': abs(float(lanc.get('valor') or 0)),
+                'descricao': lanc.get('descricao') or '',
+                'destino': None, 'data': str(lanc.get('data'))[:10],
+            }
+            self.ctx.set_pendente(chat_id, id_usuario, pend)
+            contas = self._lista(
+                self.conta_dao.get_conta(id_usuario=id_usuario))
+            botoes = [
+                [(c['apelido'], f"dest:conta:{int(c['id_conta'])}")] for c in contas[:6]]
+            responder_callback(callback_id)
+            editar_mensagem(chat_id, message_id,
+                            f"↔ {_brl(pend['valor'])} · {pend['descricao']} — em qual conta?")
+            return enviar_telegram(chat_id, "Escolha a conta <i>(vou lembrar pra próxima)</i>:", botoes)
+
         # escolha de destino: dest:conta:<id> | dest:ben:<id>
         m = re.match(r'^dest:(conta|ben):(\d+)$', data)
         if m:
@@ -265,6 +297,7 @@ class ControleiTelegramBot:
 
         id_conta = it.get('_id_conta')
         descricao = it.get('descricao') or ''
+        veio_do_historico = False
 
         if not id_conta:
             # 1) a pessoa disse o nome?
@@ -279,18 +312,27 @@ class ControleiTelegramBot:
             # 2) só uma conta
             if not id_conta and len(contas) == 1:
                 id_conta = int(contas[0]['id_conta'])
-            # 3) aprendizado
+            # 3) aprendizado: repete a conta da ÚLTIMA vez com essa descrição.
+            #    Como é sempre a mais recente, mudar de conta é só dizer o nome
+            #    uma vez ("salário no nubank") — daí em diante vai pro Nubank.
             if not id_conta and descricao:
                 id_conta = self.ctx.destino_anterior(id_usuario, descricao)
+                veio_do_historico = id_conta is not None
             # 4) pergunta com botões (uma vez; aprende no próximo)
             if not id_conta:
-                self.ctx.set_pendente(chat_id, id_usuario, {
-                                      k: v for k, v in it.items() if not k.startswith('_')})
-                botoes = [[(c['apelido'], f"dest:conta:{int(c['id_conta'])}")]
-                          for c in contas[:6]]
-                return enviar_telegram(chat_id,
-                                       f"{_brl(it['valor'])} · <b>{descricao or 'Despesa'}</b>\n"
-                                       f"Em qual conta? <i>(vou lembrar pra próxima)</i>", botoes)
+                try:
+                    self.ctx.set_pendente(
+                        chat_id, id_usuario,
+                        {k: v for k, v in it.items() if not k.startswith('_')})
+                    botoes = [[(c['apelido'], f"dest:conta:{int(c['id_conta'])}")]
+                              for c in contas[:6]]
+                    return enviar_telegram(chat_id,
+                                           f"{_brl(it['valor'])} · <b>{descricao or 'Despesa'}</b>\n"
+                                           f"Em qual conta? <i>(vou lembrar pra próxima)</i>", botoes)
+                except Exception:
+                    # sem a tabela de contexto não dá pra "perguntar e lembrar":
+                    # usa a 1ª conta (melhor que travar; o usuário vê onde caiu)
+                    id_conta = int(contas[0]['id_conta'])
 
         natureza = 'despesa' if it['intencao'] == 'gasto' else 'receita'
         dt = it.get('data')
@@ -307,13 +349,19 @@ class ControleiTelegramBot:
         conta_nome = next((c['apelido']
                           for c in contas if int(c['id_conta']) == id_conta), '')
         resumo = f"{_brl(it['valor'])} · {descricao or natureza.title()}"
-        self.ctx.set_ultimo(chat_id, id_usuario, 'lancamento', id_lanc, resumo)
+        tem_undo = self._guardar_ultimo(
+            chat_id, id_usuario, 'lancamento', id_lanc, resumo)
 
         sinal = '💸' if natureza == 'despesa' else '💰'
         quando = 'hoje' if dt == date.today() else dt.strftime('%d/%m')
+        origem = " · <i>como da última vez</i>" if veio_do_historico else ""
         texto = (f"{sinal} <b>{'Gasto' if natureza == 'despesa' else 'Receita'} {_brl(it['valor'])}</b> · "
-                 f"{descricao or natureza.title()}\n{quando} · {conta_nome} (débito)")
+                 f"{descricao or natureza.title()}\n{quando} · {conta_nome}{origem}")
         botoes = [[("↩ Desfazer", "undo")]]
+        if len(contas) > 1:
+            # troca de conta em 1 toque: desfaz este e reabre a escolha com
+            # os mesmos dados — a nova escolha vira o "último" e reensina
+            botoes[0].append(("↔ Mudar conta", "mudar")) if tem_undo else None
         if message_id:
             editar_mensagem(chat_id, message_id, texto)
             return enviar_telegram(chat_id, "✅ Registrado.", botoes)
@@ -338,13 +386,17 @@ class ControleiTelegramBot:
             if not id_ben and len(bens) == 1:
                 id_ben = int(bens[0]['id_beneficio'])
             if not id_ben:
-                self.ctx.set_pendente(chat_id, id_usuario, {
-                                      k: v for k, v in it.items() if not k.startswith('_')})
-                botoes = [[(b['dsc_beneficio'], f"dest:ben:{int(b['id_beneficio'])}")]
-                          for b in bens[:6]]
-                acao = 'Recarga' if it['intencao'] == 'beneficio_recarga' else 'Gasto'
-                return enviar_telegram(chat_id,
-                                       f"{acao} de {_brl(it['valor'])}. Em qual benefício?", botoes)
+                try:
+                    self.ctx.set_pendente(
+                        chat_id, id_usuario,
+                        {k: v for k, v in it.items() if not k.startswith('_')})
+                    botoes = [[(b['dsc_beneficio'], f"dest:ben:{int(b['id_beneficio'])}")]
+                              for b in bens[:6]]
+                    acao = 'Recarga' if it['intencao'] == 'beneficio_recarga' else 'Gasto'
+                    return enviar_telegram(chat_id,
+                                           f"{acao} de {_brl(it['valor'])}. Em qual benefício?", botoes)
+                except Exception:
+                    id_ben = int(bens[0]['id_beneficio'])
 
         tipo = 'recarga' if it['intencao'] == 'beneficio_recarga' else 'gasto'
         dt = it.get('data')
@@ -366,19 +418,28 @@ class ControleiTelegramBot:
             (float(it['valor']) if tipo == 'recarga' else -float(it['valor']))
 
         resumo = f"{_brl(it['valor'])} · {(it.get('descricao') or tipo.title())} ({ben_nome})"
-        if id_mov:
-            self.ctx.set_ultimo(chat_id, id_usuario,
-                                'beneficio_mov', id_mov, resumo)
+        tem_undo = bool(id_mov) and self._guardar_ultimo(
+            chat_id, id_usuario, 'beneficio_mov', id_mov, resumo)
 
         emoji = '🔋' if tipo == 'recarga' else '🏦'
         texto = (f"{emoji} <b>{tipo.title()} {_brl(it['valor'])}</b>"
                  f"{(' · ' + it['descricao']) if it.get('descricao') else ''}\n"
                  f"{ben_nome} · saldo agora <b>{_brl(saldo_novo)}</b>")
-        botoes = [[("↩ Desfazer", "undo")]] if id_mov else None
+        botoes = [[("↩ Desfazer", "undo")]] if tem_undo else None
         if message_id:
             editar_mensagem(chat_id, message_id, texto)
             return enviar_telegram(chat_id, "✅ Registrado.", botoes)
         return enviar_telegram(chat_id, texto, botoes)
+
+    def _guardar_ultimo(self, chat_id, id_usuario, tipo, id_, resumo) -> bool:
+        """Guarda o último registro pro Desfazer. Se a tabela de contexto não
+        existir (migração não rodou) NÃO derruba o registro — só desabilita
+        o botão Desfazer nesta resposta."""
+        try:
+            self.ctx.set_ultimo(chat_id, id_usuario, tipo, id_, resumo)
+            return True
+        except Exception:
+            return False
 
     # ---------- desfazer ----------
     def _desfazer(self, chat_id, message_id, callback_id):
