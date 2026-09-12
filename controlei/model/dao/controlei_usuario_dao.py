@@ -134,7 +134,8 @@ class ControleiUserDAO(base.DAOBase):
             query = """
                 select id_usuario, nome, email,
                        notif_email_ativo, notif_fechada_ativa,
-                       notif_avencer_ativa, notif_vencida_ativa,
+                       notif_avencer_ativa, notif_avencer_dias,
+                         notif_vencida_ativa,
                        notif_email_destino,
                        notif_telegram_ativo,
                        (telegram_chat_id IS NOT NULL) AS telegram_vinculado,
@@ -159,6 +160,7 @@ class ControleiUserDAO(base.DAOBase):
                     notif_email_ativo   = %(notif_email_ativo)s,
                     notif_fechada_ativa = %(notif_fechada_ativa)s,
                     notif_avencer_ativa = %(notif_avencer_ativa)s,
+                    notif_avencer_dias  = %(notif_avencer_dias)s,
                     notif_vencida_ativa = %(notif_vencida_ativa)s,
                     notif_email_destino = %(notif_email_destino)s,
                     notif_telegram_ativo = %(notif_telegram_ativo)s
@@ -171,6 +173,14 @@ class ControleiUserDAO(base.DAOBase):
                     parm_dict.get('notif_fechada_ativa', True),
                 'notif_avencer_ativa':
                     parm_dict.get('notif_avencer_ativa', True),
+                # dias do lembrete: só 0 (no dia), 1 e 3; padrão '3,1'
+                'notif_avencer_dias': ','.join(
+                    str(d) for d in sorted(
+                        {int(x) for x in str(parm_dict.get(
+                            'notif_avencer_dias') or '3,1')
+                         .split(',') if str(x).strip().isdigit() and int(
+                             x) in (0, 1, 3)},
+                        reverse=True)) or '3,1',
                 'notif_vencida_ativa':
                     parm_dict.get('notif_vencida_ativa', True),
                 'notif_email_destino':

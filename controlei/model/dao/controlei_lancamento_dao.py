@@ -28,7 +28,8 @@ class ControleiLancamentoDAO(base.DAOBase):
                     l.*,
                     co.id_usuario,
                     cat.dsc_categoria,
-                    ca.apelido AS apelido_cartao
+                    ca.apelido AS apelido_cartao,
+                    co.apelido AS apelido_conta
                 FROM lancamento l
                 JOIN conta co ON co.id_conta = l.id_conta
                 LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
@@ -160,7 +161,8 @@ class ControleiLancamentoDAO(base.DAOBase):
             raise DAOException(__file__, rotina, erro)
 
     def get_nome_dono_conta(self, id_conta: int):
-        """Nome do usuário dono da conta (p/ detectar transferência própria)."""
+        """Nome do usuário dono da conta
+          (p/ detectar transferência própria)."""
         rotina = 'get_nome_dono_conta'
 
         try:

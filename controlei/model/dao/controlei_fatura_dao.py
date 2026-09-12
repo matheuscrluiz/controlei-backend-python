@@ -181,6 +181,7 @@ class ControleiFaturaDAO(base.DAOBase):
                     u.email AS email_usuario, u.nome AS nome_usuario,
                     COALESCE(u.notif_email_destino, u.email) AS email_destino,
                     u.notif_fechada_ativa, u.notif_avencer_ativa,
+                    u.notif_avencer_dias,
                     u.notif_vencida_ativa,
                     u.notif_email_ativo,
                     u.telegram_chat_id, u.notif_telegram_ativo,
@@ -189,7 +190,7 @@ class ControleiFaturaDAO(base.DAOBase):
                   + COALESCE((SELECT SUM(i.valor) FROM fatura_item i
                               WHERE i.id_fatura = f.id_fatura), 0) AS total,
                     f.notif_fechada, f.notif_avencer_3,
-                    f.notif_avencer_1, f.notif_vencida_em
+                    f.notif_avencer_1, f.notif_avencer_0, f.notif_vencida_em
                 FROM fatura f
                 JOIN cartao  ca ON ca.id_cartao  = f.id_cartao
                 JOIN conta   co ON co.id_conta   = ca.id_conta
@@ -218,7 +219,7 @@ class ControleiFaturaDAO(base.DAOBase):
 
         permitidos = {
             'notif_fechada', 'notif_avencer_3',
-            'notif_avencer_1', 'notif_vencida_em',
+            'notif_avencer_1', 'notif_avencer_0', 'notif_vencida_em',
         }
         if campo not in permitidos:
             raise DAOException(__file__, rotina, f'Campo inválido: {campo}')
