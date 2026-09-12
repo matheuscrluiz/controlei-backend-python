@@ -43,10 +43,18 @@ def _norm(s: str) -> str:
 # ---------- vocabulário ----------
 V_GASTO = ('gastei', 'gasto', 'paguei', 'comprei', 'compra', 'despesa', 'saiu')
 V_RECEITA = ('recebi', 'receita', 'entrou', 'ganhei', 'caiu')
+# coisas que SÃO receita mesmo sem verbo: "2100 de salário", "500 freela"
+N_RECEITA = ('salario', 'salario', 'freela', 'freelance',
+             'reembolso', 'cashback',
+             'decimo terceiro', '13o', 'ferias', 'bonus',
+             'comissao', 'dividendo',
+             'dividendos', 'rendimento', 'rendimentos', 'aluguel recebido',
+             'pix recebido', 'venda', 'vendi',
+             'pagamento recebido', 'restituicao')
 V_RECARGA = ('recarga', 'recarreguei', 'recarregou', 'carregou', 'creditou')
 # palavras que indicam benefício (VA/VR/VT) — o destino é o benefício
-V_BENEFICIO = ('vale', 'va', 'vr', 'vt', 'beneficio', 'alimentacao',
-               'refeicao',
+V_BENEFICIO = ('vale', 'va', 'vr', 'vt', 'beneficio',
+               'alimentacao', 'refeicao',
                'transporte', 'ticket', 'alelo', 'sodexo', 'pluxee', 'flash')
 V_SALDO = ('saldo', 'quanto tenho', 'quanto eu tenho', 'tenho quanto')
 V_GASTOS = ('quanto gastei', 'gastos', 'quanto ja gastei', 'gastei quanto',
@@ -64,8 +72,8 @@ _RELATIVAS = {
     'hoje': 0, 'ontem': 1, 'anteontem': 2,
 }
 
-# destino: "no nubank", "na santander", "em dinheiro", "pelo cartao",
-#  "com o vale"
+# destino: "no nubank", "na santander", "em dinheiro",
+#  "pelo cartao", "com o vale"
 _DESTINO_RE = re.compile(
     r'\b(?:no|na|em|pelo|pela|com o|com a|do|da)\s+(.+?)$')
 
@@ -90,8 +98,8 @@ def _parse_data(txt: str, hoje: date):
     """Extrai a data e devolve (date, texto_sem_data)."""
     for palavra, delta in _RELATIVAS.items():
         if re.search(rf'\b{palavra}\b', txt):
-            return hoje - timedelta(days=delta), re.sub(
-                rf'\b{palavra}\b', ' ', txt)
+            return hoje - timedelta(
+                days=delta), re.sub(rf'\b{palavra}\b', ' ', txt)
 
     m = _DATA_RE.search(txt)
     if m:
@@ -152,8 +160,8 @@ def interpretar(mensagem: str, hoje: date = None) -> dict:
         return out
 
     # ---- consultas (sem valor) ----
-    if _tem(txt, V_AJUDA) or txt in ('oi', 'ola', 'bom dia',
-                                     'boa tarde', 'boa noite'):
+    if _tem(txt, V_AJUDA) or txt in ('oi', 'ola', 'bom dia', 'boa tarde',
+                                     'boa noite'):
         out['intencao'] = 'ajuda'
         return out
     if _tem(txt, V_SALDO) and not _VALOR_RE.search(txt):
@@ -166,7 +174,8 @@ def interpretar(mensagem: str, hoje: date = None) -> dict:
     # ---- registro ----
     eh_beneficio = _tem(txt, V_BENEFICIO)
     eh_recarga = _tem(txt, V_RECARGA)
-    eh_receita = _tem(txt, V_RECEITA) and not eh_recarga
+    eh_receita = (_tem(txt, V_RECEITA) or _tem(
+        txt, N_RECEITA)) and not eh_recarga
     # verbos saem da descrição
     txt = _remover(txt, V_GASTO + V_RECEITA + V_RECARGA)
 
@@ -188,6 +197,9 @@ def interpretar(mensagem: str, hoje: date = None) -> dict:
         txt = _remover(txt, V_BENEFICIO)
 
     descricao = re.sub(r'^[\s\-–:,.]+|[\s\-–:,.]+$', '', txt)
+    # preposição sobrando na frente ("de salario", "com uber", "pra mae")
+    descricao = re.sub(
+        r'^(de|do|da|dos|das|com|pra|para|pro|em|no|na)\s+', '', descricao)
     out['descricao'] = descricao
     out['destino'] = destino
     out['valor'] = valor
