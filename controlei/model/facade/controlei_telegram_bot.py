@@ -213,6 +213,14 @@ class ControleiTelegramBot:
             return enviar_telegram(chat_id,
                                    f"🤔 {it['erro'] or 'Não entendi.'}\n\n{TEXTO_AJUDA}")
 
+        # "187,40" sozinho (sem descrição) e há recorrência variável aguardando
+        # valor → é a resposta ao pedido "quanto veio?": confirma a pendência
+        if (it['intencao'] == 'gasto' and not it.get('descricao')
+                and not it.get('destino')):
+            pend = self._pendentes_variaveis(id_usuario)
+            if pend:
+                return self._confirmar_pendente(chat_id, id_usuario, pend, float(it['valor']))
+
         if it['intencao'] in ('gasto', 'receita'):
             return self._registrar_conta(chat_id, id_usuario, it)
         if it['intencao'] in ('beneficio_gasto', 'beneficio_recarga'):
@@ -261,6 +269,24 @@ class ControleiTelegramBot:
                             f"↔ {_brl(pend['valor'])} · {pend['descricao']} — em qual conta?")
             return enviar_telegram(chat_id, "Escolha a conta <i>(vou lembrar pra próxima)</i>:", botoes)
 
+        # confirmação de recorrência variável: conf:<id_lancamento>
+        m = re.match(r'^conf:(\d+)$', data)
+        if m:
+            ctx = self.ctx.get(chat_id) or {}
+            pend = ctx.get('pendente')
+            if isinstance(pend, str):
+                try:
+                    pend = json.loads(pend)
+                except ValueError:
+                    pend = None
+            valor = (pend or {}).get('confirmar_valor')
+            if valor is None:
+                return responder_callback(callback_id, "Esse pedido já foi resolvido.")
+            self.lanc.confirmar_lancamento(int(m.group(1)), float(valor))
+            self.ctx.set_pendente(chat_id, id_usuario, {})
+            responder_callback(callback_id, "Confirmado.")
+            return editar_mensagem(chat_id, message_id, f"✅ Confirmado: {_brl(valor)}")
+
         # escolha de destino: dest:conta:<id> | dest:ben:<id>
         m = re.match(r'^dest:(conta|ben):(\d+)$', data)
         if m:
@@ -288,6 +314,30 @@ class ControleiTelegramBot:
             return
 
         responder_callback(callback_id)
+
+    # ---------- recorrência variável aguardando valor ----------
+    def _pendentes_variaveis(self, id_usuario):
+        """Lançamentos 'previsto' com valor 0 (recorrência variável)."""
+        try:
+            todos = self.lanc.obter_lancamento(
+                id_usuario=id_usuario, status='previsto')
+            return [l for l in (todos or []) if abs(float(l.get('valor') or 0)) < 0.005]
+        except Exception:
+            return []
+
+    def _confirmar_pendente(self, chat_id, id_usuario, pend, valor: float):
+        if len(pend) == 1:
+            l = pend[0]
+            self.lanc.confirmar_lancamento(int(l['id_lancamento']), valor)
+            return enviar_telegram(chat_id,
+                                   f"✅ <b>{l.get('descricao') or 'Conta fixa'}</b> confirmada: "
+                                   f"{_brl(valor)}\n{l.get('apelido') or ''} · {str(l.get('data'))[:10]}")
+        # várias aguardando: pergunta qual, guardando o valor
+        self.ctx.set_pendente(chat_id, id_usuario, {'confirmar_valor': valor})
+        botoes = [[(f"{l.get('descricao')} ({str(l.get('data'))[:10]})",
+                    f"conf:{int(l['id_lancamento'])}")] for l in pend[:6]]
+        return enviar_telegram(chat_id,
+                               f"{_brl(valor)} é de qual conta fixa?", botoes)
 
     # ---------- registrar em CONTA (gasto / receita) ----------
     def _registrar_conta(self, chat_id, id_usuario, it: dict, message_id=None):

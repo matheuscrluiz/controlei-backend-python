@@ -60,7 +60,8 @@ def _fmt_moeda(v: float) -> str:
 
 
 def _normalizar_competencia(competencia) -> date:
-    """Aceita date ou string ('YYYY-MM' / 'YYYY-MM-DD') e devolve o 1º do mês."""
+    """Aceita date ou string ('YYYY-MM' / 'YYYY-MM-DD')
+      e devolve o 1º do mês."""
     if isinstance(competencia, date):
         return date(competencia.year, competencia.month, 1)
     texto = str(competencia).strip()
@@ -205,38 +206,49 @@ class ControleiFaturaFacade():
                             enviados['vencida'] += 1
                     continue
 
-                # ---- A VENCER (3 e 1 dia) ----
-                if dias == 3 and not f.get('notif_avencer_3'):
-                    if not f.get('notif_avencer_ativa'):
+                # ---- A VENCER (dias configuráveis: 3 / 1 / 0=no dia) ----
+                # O usuário escolhe em quais dias quer o lembrete
+                # (notif_avencer_dias, ex.: '3,1', '0', '3,1,0'). Cada dia
+                # tem sua flag por fatura pra não repetir.
+                if dias is not None and 0 <= dias <= 3 and f.get(
+                        'notif_avencer_ativa'):
+                    cfg = str(f.get('notif_avencer_dias') or '3,1')
+                    dias_cfg = {int(x) for x in cfg.split(',')
+                                if x.strip().isdigit()}
+                    flag = {3: 'notif_avencer_3', 1: 'notif_avencer_1',
+                            0: 'notif_avencer_0'}.get(dias)
+                    if dias in dias_cfg and flag and not f.get(flag):
+                        if dias == 0:
+                            titulo, quando, emoji = (
+                                "Fatura vence hoje",
+                                "vence hoje", "🔔"
+                            )
+                            acento = "#C2414C"
+                        elif dias == 1:
+                            titulo, quando, emoji = (
+                                "Fatura vence amanhã",
+                                "vence amanhã", "⏰"
+                            )
+                            acento = "#E0A23C"
+                        else:
+                            titulo, quando, emoji = (
+                                "Fatura a vencer",
+                                f"vence em {dias} dias", "⏳"
+                            )
+                            acento = "#E0A23C"
+                        sub = f"{nome}, sua fatura de {cartao} {quando}."
+                        html = render_email(
+                            titulo, sub, base_linhas, "Pagar fatura",
+                            etiqueta=titulo.replace(
+                                "Fatura ", "").capitalize(),
+                            acento=acento)
+                        texto_tg = render_telegram(
+                            titulo, sub, base_linhas, emoji=emoji)
+                        if _despachar(
+                                f, f"{titulo} — {cartao}", html, texto_tg):
+                            self.dao.marcar_notif(f['id_fatura'], flag, True)
+                            enviados['avencer'] += 1
                         continue
-                    titulo = "Fatura a vencer"
-                    sub = f"{nome}, sua fatura de {cartao} vence em 3 dias."
-                    html = render_email(
-                        titulo, sub, base_linhas, "Pagar fatura",
-                        etiqueta="Vence em 3 dias", acento="#E0A23C")
-                    texto_tg = render_telegram(
-                        titulo, sub, base_linhas, emoji="⏳")
-                    if _despachar(f, f"{titulo} — {cartao}", html, texto_tg):
-                        self.dao.marcar_notif(
-                            f['id_fatura'], 'notif_avencer_3', True)
-                        enviados['avencer'] += 1
-                    continue
-
-                if dias == 1 and not f.get('notif_avencer_1'):
-                    if not f.get('notif_avencer_ativa'):
-                        continue
-                    titulo = "Fatura vence amanhã"
-                    sub = f"{nome}, sua fatura de {cartao} vence amanhã."
-                    html = render_email(
-                        titulo, sub, base_linhas, "Pagar fatura",
-                        etiqueta="Vence amanhã", acento="#E0A23C")
-                    texto_tg = render_telegram(
-                        titulo, sub, base_linhas, emoji="⏰")
-                    if _despachar(f, f"{titulo} — {cartao}", html, texto_tg):
-                        self.dao.marcar_notif(
-                            f['id_fatura'], 'notif_avencer_1', True)
-                        enviados['avencer'] += 1
-                    continue
 
                 # ---- FECHADA (uma vez) ----
                 if status == 'fechada' and not f.get('notif_fechada'):
@@ -340,7 +352,8 @@ class ControleiFaturaFacade():
 
     def atualizar_status_fatura(self, id_fatura: int, status: str):
         """Primitiva de status (aberta/fechada/paga). O 'pagar fatura' completo
-        — com a transferência que baixa o saldo — virá no fluxo de pagamento."""
+        — com a transferência que baixa o saldo
+          — virá no fluxo de pagamento."""
         rotina = 'atualizar_status_fatura'
 
         try:
