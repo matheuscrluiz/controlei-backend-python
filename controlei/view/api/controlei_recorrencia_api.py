@@ -115,6 +115,26 @@ class RecorrenciaGerar(Resource):
         )
 
 
+p_notificar_rec = api.parser().add_argument(
+    name='X-Cron-Secret', location='headers', required=True,
+    help="Segredo do cron (igual à env CRON_SECRET)")
+
+
+@api.route('/notificar')
+class RecorrenciasNotificar(Resource):
+    @api.expect(p_notificar_rec)
+    def post(self):
+        """Avisa as contas fixas que caem HOJE e lembra as variáveis
+        pendentes. Uso do cron diário. Protegido por X-Cron-Secret."""
+        segredo = os.environ.get('CRON_SECRET')
+        enviado = request.headers.get('X-Cron-Secret')
+        if not segredo or enviado != segredo:
+            return {'erro': 'Não autorizado'}, 401
+        resultado = rec_f().processar_notificacoes_recorrencias()
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, resultado))
+
+
 @api.route('/gerar-todas')
 class RecorrenciaGerarTodas(Resource):
     @api.expect(model_gerar_todas)
