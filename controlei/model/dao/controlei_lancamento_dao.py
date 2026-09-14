@@ -28,7 +28,8 @@ class ControleiLancamentoDAO(base.DAOBase):
                     l.*,
                     co.id_usuario,
                     cat.dsc_categoria,
-                    ca.apelido AS apelido_cartao
+                    ca.apelido AS apelido_cartao,
+                    co.apelido AS apelido_conta
                 FROM lancamento l
                 JOIN conta co ON co.id_conta = l.id_conta
                 LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
@@ -73,6 +74,47 @@ class ControleiLancamentoDAO(base.DAOBase):
 
             return self.convert_dataframe_to_dict(dataframe)
 
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_previstos_para_notificar(self) -> dict:
+        """Lançamentos 'previsto' de recorrência com data <= hoje, com os
+        dados do usuário pra despacho. O facade decide: no dia (não avisado)
+        ou atrasado (variável sem valor, lembrete a cada 3 dias)."""
+        rotina = 'get_previstos_para_notificar'
+
+        try:
+            query = """
+                SELECT l.id_lancamento, l.id_conta,
+                  l.natureza, l.valor, l.data,
+                       l.descricao, l.notif_dia, l.notif_atraso_em,
+                       co.apelido AS apelido_conta,
+                       u.id_usuario, u.nome, u.email,
+                       u.notif_email_ativo, u.notif_email_destino,
+                       u.notif_telegram_ativo, u.telegram_chat_id
+                FROM lancamento l
+                JOIN conta co ON co.id_conta = l.id_conta
+                JOIN usuario u ON u.id_usuario = co.id_usuario
+                WHERE l.status = 'previsto'
+                  AND l.id_recorrencia IS NOT NULL
+                  AND l.data <= CURRENT_DATE
+                ORDER BY u.id_usuario, l.data
+            """
+            dataframe = pd.read_sql(sql=query, con=self.get_connection())
+            return self.convert_dataframe_to_dict(dataframe)
+
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def marcar_notif_lancamento(self, id_lancamento: int, coluna: str, valor):
+        """Marca controle de notificação (whitelist de colunas)."""
+        rotina = 'marcar_notif_lancamento'
+        if coluna not in ('notif_dia', 'notif_atraso_em'):
+            raise ValueError('coluna inválida')
+        try:
+            self.execute_dml_command_parms(
+                f"UPDATE lancamento SET {coluna} = %(v)s WHERE id_lancamento = %(id)s",
+                {'v': valor, 'id': id_lancamento})
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
@@ -160,7 +202,8 @@ class ControleiLancamentoDAO(base.DAOBase):
             raise DAOException(__file__, rotina, erro)
 
     def get_nome_dono_conta(self, id_conta: int):
-        """Nome do usuário dono da conta (p/ detectar transferência própria)."""
+        """Nome do usuário dono da conta
+          (p/ detectar transferência própria)."""
         rotina = 'get_nome_dono_conta'
 
         try:
