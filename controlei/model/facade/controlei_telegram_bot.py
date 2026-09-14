@@ -321,7 +321,12 @@ class ControleiTelegramBot:
         try:
             todos = self.lanc.obter_lancamento(
                 id_usuario=id_usuario, status='previsto')
-            return [l for l in (todos or []) if abs(float(l.get('valor') or 0)) < 0.005]
+            hoje = date.today()
+            # só as que já chegaram no dia: o job gera o mês inteiro no dia
+            # 1, mas "quanto veio?" só faz sentido depois da data
+            return [l for l in (todos or [])
+                    if abs(float(l.get('valor') or 0)) < 0.005
+                    and datetime.strptime(str(l.get('data'))[:10], '%Y-%m-%d').date() <= hoje]
         except Exception:
             return []
 
