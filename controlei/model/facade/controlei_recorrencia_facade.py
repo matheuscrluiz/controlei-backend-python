@@ -141,8 +141,7 @@ class ControleiRecorrenciaFacade():
             recorrência variável entra com valor 0, pra você preencher ao
             confirmar.
           - crédito/cartão -> compra de 1x (cai na fatura do mês).
-        O GATILHO (quando chamar isto) fica a cargo do job/preguiçoso;
-          aqui só a
+        O GATILHO (quando chamar isto) fica a cargo do job/preguiçoso; aqui só a
         materialização.
         """
         rotina = 'gerar_ocorrencia'
@@ -258,23 +257,135 @@ class ControleiRecorrenciaFacade():
             linhas.append((g['descricao'], "quanto veio?"))
 
         n = len(itens)
-        titulo = "Contas fixas de hoje" if n > 1 else "Conta fixa de hoje"
-        if variaveis and not fixas:
-            sub = ("Chegou a hora de informar o valor de "
-                   + (f"{len(variaveis)} contas" if len(variaveis) > 1
-                      else f"'{variaveis[0]['descricao']}'") + ".")
-        elif variaveis:
-            sub = (f"{len(fixas)} lançada(s) automaticamente e "
-                   f"{len(variaveis)} aguardando o valor.")
-        else:
-            sub = f"{n} lançada(s) automaticamente no seu extrato."
+        mes = date.today().strftime('%B').lower()
+        titulo = f"Contas fixas de {mes} programadas"
+        sub = (f"{n} conta(s) fixa(s) programada(s) para este mês"
+               + (f" — {len(variaveis)} com valor a informar." if variaveis else ".")
+               + " Te aviso no dia de cada uma.")
 
-        dica_tg = (
-            "\n\n💬 Pra confirmar uma variável, responda só o valor: <b>187,40</b>"
-            if variaveis else "")
+        dica_tg = ""
         texto_tg = render_telegram(titulo, sub, linhas, emoji="🔁") + dica_tg
         html = render_email(titulo, sub, linhas, "Ver no Controlei",
                             etiqueta="Recorrência", acento="#0FA088")
+
+        ok = False
+        email = prefs.get('notif_email_destino') or prefs.get('email')
+        if prefs.get('notif_email_ativo') and email:
+            ok = enviar_email(email, f"{titulo} — Controlei", html) or ok
+        chat_id = prefs.get('telegram_chat_id')
+        if prefs.get('notif_telegram_ativo') and chat_id:
+            ok = enviar_telegram(str(chat_id), texto_tg) or ok
+        return ok
+
+    def processar_notificacoes_recorrencias(self):
+        """
+        Cron DIÁRIO. Para cada recorrência 'previsto' com data <= hoje:
+          * NO DIA (notif_dia = false): avisa que a conta cai hoje. Fixa →
+            "sai hoje da conta X"; variável → "quanto veio?".
+          * ATRASADA (variável, data < hoje, sem valor): lembra a cada 3 dias
+            até confirmar.
+        Uma mensagem por usuário agrupando tudo. Idempotente por dia.
+        """
+        rotina = 'processar_notificacoes_recorrencias'
+        try:
+            hoje = date.today()
+            itens = convert_unique_dic_to_arrayDict(
+                self.lancamento_dao.get_previstos_para_notificar())
+
+            por_usuario = {}
+            for l in itens:
+                d = _normalizar_data(l['data'])
+                variavel = abs(float(l.get('valor') or 0)) < 0.005
+                if d == hoje and not l.get('notif_dia'):
+                    tipo = 'hoje'
+                elif d < hoje and variavel:
+                    ultimo = l.get('notif_atraso_em')
+                    ultimo = _normalizar_data(ultimo) if ultimo else None
+                    if ultimo is None or (hoje - ultimo).days >= 3:
+                        tipo = 'atrasada'
+                    else:
+                        continue
+                elif d < hoje and not variavel and not l.get('notif_dia'):
+                    # fixa que passou sem aviso (cron falhou naquele dia):
+                    # avisa como "caiu dia X" e marca
+                    tipo = 'hoje'
+                else:
+                    continue
+                l['_tipo'] = tipo
+                l['_variavel'] = variavel
+                por_usuario.setdefault(l['id_usuario'], []).append(l)
+
+            enviados = {'usuarios': 0, 'hoje': 0, 'atrasadas': 0}
+            for id_usuario, lista in por_usuario.items():
+                try:
+                    if self._notificar_do_dia(lista, hoje):
+                        enviados['usuarios'] += 1
+                        for l in lista:
+                            if l['_tipo'] == 'hoje':
+                                self.lancamento_dao.marcar_notif_lancamento(
+                                    l['id_lancamento'], 'notif_dia', True)
+                                enviados['hoje'] += 1
+                            else:
+                                self.lancamento_dao.marcar_notif_lancamento(
+                                    l['id_lancamento'], 'notif_atraso_em',
+                                    hoje)
+                                enviados['atrasadas'] += 1
+                        self.lancamento_dao.database_commit()
+                except Exception:
+                    pass
+            return enviados
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def _notificar_do_dia(self, lista, hoje) -> bool:
+        """Monta e despacha a mensagem do dia pro usuário
+          (dados vêm na lista)."""
+        prefs = lista[0]
+
+        def _brl(v):
+            v = float(v or 0)
+            return "R$ " + f"{v:,.2f}".replace(",", "X").replace(
+                ".", ",").replace("X", ".")
+
+        hoje_l = [l for l in lista if l['_tipo'] == 'hoje']
+        atras_l = [l for l in lista if l['_tipo'] == 'atrasada']
+
+        linhas = []
+        for l in hoje_l:
+            if l['_variavel']:
+                linhas.append(
+                    (f"{l['descricao']} · {l.get('apelido_conta') or ''}", "quanto veio?"))
+            else:
+                sinal = '−' if l['natureza'] == 'despesa' else '+'
+                linhas.append((f"{l['descricao']} · {l.get('apelido_conta') or ''}",
+                               f"{sinal} {_brl(l['valor'])}"))
+        for l in atras_l:
+            d = _normalizar_data(l['data'])
+            linhas.append(
+                (f"{l['descricao']} · dia {d.day:02d}", "ainda sem valor"))
+
+        if hoje_l and atras_l:
+            titulo = "Contas fixas: hoje e pendentes"
+            sub = (f"{len(hoje_l)} cai(em) hoje e {len(atras_l)} "
+                   f"aguarda(m) o valor desde dias atrás.")
+        elif hoje_l:
+            titulo = "Cai hoje" if len(hoje_l) == 1 else "Caem hoje"
+            variaveis = [l for l in hoje_l if l['_variavel']]
+            if variaveis and len(variaveis) == len(hoje_l):
+                sub = "Chegou a conta — me diz quanto veio pra eu lançar certo."
+            elif variaveis:
+                sub = "Algumas já lançadas; as variáveis precisam do valor."
+            else:
+                sub = "Lançadas automaticamente no seu extrato."
+        else:
+            titulo = "Contas fixas aguardando valor"
+            sub = "Passaram do dia e ainda estão sem valor — confirma pra eu fechar o mês certo."
+
+        dica = ("\n\n💬 Responda só o valor (ex.: <b>187,40</b>) e eu confirmo."
+                if any(l['_variavel'] for l in lista) else "")
+        texto_tg = render_telegram(titulo, sub, linhas, emoji="🔁") + dica
+        html = render_email(titulo, sub, linhas, "Ver no Controlei",
+                            etiqueta="Conta fixa", acento="#E0A23C" if atras_l else "#0FA088")
 
         ok = False
         email = prefs.get('notif_email_destino') or prefs.get('email')
@@ -313,7 +424,7 @@ class ControleiRecorrenciaFacade():
                 except Exception:
                     erros += 1
 
-            # ---- NOTIFICAÇÃO: uma mensagem por usuário com o que caiu hoje
+            # ---- NOTIFICAÇÃO: uma mensagem por usuário com o que caiu hoje ----
             # Sem isso a recorrência é invisível: gera no extrato e ninguém vê.
             # Variáveis pedem o valor — e o bot do Telegram aceita a resposta
             # ("187,40") como confirmação.
