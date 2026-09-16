@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from flask_restx import Resource
+from flask_restx import Resource, fields
 from flask_restx.namespace import Namespace
 from controlei.util.util import get_dict_retorno_endpoint
 from .model.controlei_conta_model import generate_conta_model
@@ -99,6 +99,28 @@ class ContaCollection(Resource):
                 MSG_SUCESSO,
                 None)
         )
+
+
+conciliar_model = api.model('Conta_conciliar', {
+    'id_conta': fields.Integer(required=True, description='ID da conta'),
+    'id_usuario': fields.Integer(required=True, description='ID do usuário'),
+    'saldo_informado': fields.Float(
+        required=True, description='Saldo que o banco mostra agora'),
+})
+
+
+@api.route('/conciliar')
+class ContaConciliar(Resource):
+    @api.expect(conciliar_model, validate=True)
+    def post(self):
+        """Concilia o saldo: registra a diferença como rendimento/ajuste.
+        Devolve diferenca, tipo (rendimento | ajuste_positivo |
+        ajuste_negativo | igual) e o id do lançamento criado."""
+        d = request.get_json()
+        result = conta_f().conciliar_saldo(
+            d['id_conta'], d['saldo_informado'], d['id_usuario'])
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 
 
 @api.route('/<int:id_conta>')
