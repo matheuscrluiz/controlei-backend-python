@@ -85,8 +85,7 @@ class ControleiLancamentoDAO(base.DAOBase):
 
         try:
             query = """
-                SELECT l.id_lancamento, l.id_conta,
-                  l.natureza, l.valor, l.data,
+                SELECT l.id_lancamento, l.id_conta, l.natureza, l.valor, l.data,
                        l.descricao, l.notif_dia, l.notif_atraso_em,
                        co.apelido AS apelido_conta,
                        u.id_usuario, u.nome, u.email,
@@ -126,13 +125,13 @@ class ControleiLancamentoDAO(base.DAOBase):
                 INSERT INTO lancamento (
                     id_conta, id_categoria, id_cartao, id_transferencia,
                     id_recorrencia, natureza, valor, data, descricao, status,
-                    import_ref
+                    import_ref, origem
                 )
                 VALUES (
                     %(id_conta)s, %(id_categoria)s, %(id_cartao)s,
                     %(id_transferencia)s, %(id_recorrencia)s, %(natureza)s,
                     %(valor)s, %(data)s, %(descricao)s, %(status)s,
-                    %(import_ref)s
+                    %(import_ref)s, %(origem)s
                 )
                 RETURNING id_lancamento
             """
@@ -149,6 +148,7 @@ class ControleiLancamentoDAO(base.DAOBase):
                 "descricao": parm_dict.get("descricao"),
                 "status": parm_dict.get("status") or 'efetivado',
                 "import_ref": parm_dict.get("import_ref"),
+                "origem": parm_dict.get("origem"),
             }
 
             id_lancamento = self.execute_dml_command_parms(cmdSql, params)
@@ -202,8 +202,7 @@ class ControleiLancamentoDAO(base.DAOBase):
             raise DAOException(__file__, rotina, erro)
 
     def get_nome_dono_conta(self, id_conta: int):
-        """Nome do usuário dono da conta
-          (p/ detectar transferência própria)."""
+        """Nome do usuário dono da conta (p/ detectar transferência própria)."""
         rotina = 'get_nome_dono_conta'
 
         try:
