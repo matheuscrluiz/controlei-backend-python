@@ -84,6 +84,8 @@ class ControleiLancamentoFacade():
                 'descricao': parm_dict.get('descricao'),
                 'status': (parm_dict.get('status') or 'efetivado'),
                 'import_ref': parm_dict.get('import_ref'),
+                # rastreabilidade: conciliacao | telegram | importacao | ...
+                'origem': parm_dict.get('origem'),
             }
 
             id_lancamento = self.dao.insert_lancamento(parms)

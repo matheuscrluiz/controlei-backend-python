@@ -53,10 +53,11 @@ class ControleiContaDAO(base.DAOBase):
         try:
             cmdSql = """
                 INSERT INTO conta (
-                    id_usuario, id_instituicao, apelido, tipo
+                    id_usuario, id_instituicao, apelido, tipo, rende
                 )
                 VALUES (
-                    %(id_usuario)s, %(id_instituicao)s, %(apelido)s, %(tipo)s
+                    %(id_usuario)s, %(id_instituicao)s, %(apelido)s, %(tipo)s,
+                    %(rende)s
                 )
                 RETURNING id_conta
             """
@@ -66,11 +67,21 @@ class ControleiContaDAO(base.DAOBase):
                 "id_instituicao": parm_dict.get("id_instituicao"),
                 "apelido": parm_dict.get("apelido"),
                 "tipo": parm_dict.get("tipo"),
+                "rende": bool(parm_dict.get("rende") or False),
             }
 
             id_conta = self.execute_dml_command_parms(cmdSql, params)
             return id_conta
 
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def marcar_conciliacao(self, id_conta: int, data):
+        rotina = 'marcar_conciliacao'
+        try:
+            self.execute_dml_command_parms(
+                "UPDATE conta SET ultima_conciliacao = %(d)s WHERE id_conta = %(id)s",
+                {'d': data, 'id': id_conta})
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
@@ -84,7 +95,8 @@ class ControleiContaDAO(base.DAOBase):
                 SET
                     id_instituicao = %(id_instituicao)s,
                     apelido        = %(apelido)s,
-                    tipo           = %(tipo)s
+                    tipo           = %(tipo)s,
+                    rende          = %(rende)s
                 WHERE id_conta = %(id_conta)s
             """
 
@@ -93,6 +105,7 @@ class ControleiContaDAO(base.DAOBase):
                 "id_instituicao": parm_dict.get("id_instituicao"),
                 "apelido": parm_dict.get("apelido"),
                 "tipo": parm_dict.get("tipo"),
+                "rende": bool(parm_dict.get("rende") or False),
             }
 
             self.execute_dml_command_parms(cmdSql, params)

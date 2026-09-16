@@ -156,8 +156,16 @@ def interpretar(mensagem: str, hoje: date = None) -> dict:
     if _tem(txt, V_AJUDA) or txt in ('oi', 'ola', 'bom dia', 'boa tarde', 'boa noite'):
         out['intencao'] = 'ajuda'
         return out
-    if _tem(txt, V_SALDO) and not _VALOR_RE.search(txt):
-        out['intencao'] = 'consulta_saldo'
+    if _tem(txt, V_SALDO):
+        if not _VALOR_RE.search(txt):
+            out['intencao'] = 'consulta_saldo'
+            return out
+        # "saldo santander 107250,10" → CONCILIAÇÃO: informa o saldo real da
+        # conta e o app registra a diferença (rendimento / ajuste)
+        valor, resto = _parse_valor(_remover(txt, V_SALDO))
+        resto = re.sub(r'^(do|da|de|no|na)\s+', '', resto).strip()
+        out.update({'intencao': 'conciliar', 'valor': valor,
+                   'destino': resto or None})
         return out
     if _tem(txt, V_GASTOS) and not _VALOR_RE.search(txt):
         out['intencao'] = 'consulta_gastos'
@@ -223,7 +231,8 @@ TEXTO_AJUDA = (
     "🔋 <b>recarga 800 vale</b> — recarga do vale\n"
     "📅 pode dizer <b>ontem</b>, <b>dia 5</b> ou <b>05/09</b>\n"
     "🏷 e onde foi: <b>no nubank</b>, <b>no débito</b>\n\n"
-    "Consultas: <b>saldo</b> · <b>quanto gastei</b>\n\n"
+    "Consultas: <b>saldo</b> · <b>quanto gastei</b>\n"
+    "🏦 <b>saldo nubank 1.250,40</b> — conferir saldo: o que o banco mostra vira rendimento/ajuste\n\n"
     "💡 Eu lembro em qual conta cada coisa caiu da última vez. "
     "Pra mudar, é só dizer uma vez: <b>salário no nubank</b>."
 )

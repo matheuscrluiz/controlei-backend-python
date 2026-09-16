@@ -28,6 +28,7 @@ from ...util.controlei_telegram_parser import interpretar, TEXTO_AJUDA
 from ...util.exceptions import DAOException
 from ..base import controlei_dao_base as base
 from ..dao.controlei_conta_dao import ControleiContaDAO
+from .controlei_conta_facade import ControleiContaFacade
 from ..dao.controlei_derivados_dao import ControleiDerivadosDAO
 from .controlei_lancamento_facade import ControleiLancamentoFacade
 from .controlei_beneficio_facade import ControleiBeneficioFacade
@@ -190,6 +191,7 @@ class ControleiTelegramBot:
         self.deriv = ControleiDerivadosDAO()
         self.lanc = ControleiLancamentoFacade()
         self.ben = ControleiBeneficioFacade()
+        self.conta_f = ControleiContaFacade()
 
     # ---------- entrada: mensagem de texto ----------
     def tratar_mensagem(self, chat_id: str, texto: str):
@@ -209,6 +211,8 @@ class ControleiTelegramBot:
             return self._responder_saldo(chat_id, id_usuario)
         if it['intencao'] == 'consulta_gastos':
             return self._responder_gastos(chat_id, id_usuario)
+        if it['intencao'] == 'conciliar':
+            return self._conciliar(chat_id, id_usuario, it)
         if it['intencao'] == 'desconhecido':
             return enviar_telegram(chat_id,
                                    f"🤔 {it['erro'] or 'Não entendi.'}\n\n{TEXTO_AJUDA}")
@@ -268,6 +272,29 @@ class ControleiTelegramBot:
             editar_mensagem(chat_id, message_id,
                             f"↔ {_brl(pend['valor'])} · {pend['descricao']} — em qual conta?")
             return enviar_telegram(chat_id, "Escolha a conta <i>(vou lembrar pra próxima)</i>:", botoes)
+
+        # conciliação: escolheu a conta → conc:<id_conta>
+        m = re.match(r'^conc:(\d+)$', data)
+        if m:
+            ctx = self.ctx.get(chat_id) or {}
+            pend = ctx.get('pendente')
+            if isinstance(pend, str):
+                try:
+                    pend = json.loads(pend)
+                except ValueError:
+                    pend = None
+            if not pend or pend.get('intencao') != 'conciliar':
+                return responder_callback(callback_id, "Esse pedido já foi resolvido.")
+            contas = self._lista(
+                self.conta_dao.get_conta(id_usuario=id_usuario))
+            c = next((x for x in contas if int(
+                x['id_conta']) == int(m.group(1))), None)
+            responder_callback(callback_id)
+            self.ctx.set_pendente(chat_id, id_usuario, {})
+            if c:
+                self._executar_conciliacao(chat_id, id_usuario, int(c['id_conta']), c['apelido'],
+                                           float(pend['valor']), message_id=message_id)
+            return
 
         # confirmação de recorrência variável: conf:<id_lancamento>
         m = re.match(r'^conf:(\d+)$', data)
@@ -344,6 +371,52 @@ class ControleiTelegramBot:
         return enviar_telegram(chat_id,
                                f"{_brl(valor)} é de qual conta fixa?", botoes)
 
+    # ---------- conciliar saldo ("saldo nubank 1250,40") ----------
+    def _conciliar(self, chat_id, id_usuario, it):
+        contas = self._lista(self.conta_dao.get_conta(id_usuario=id_usuario))
+        if not contas:
+            return enviar_telegram(chat_id, "Você ainda não tem contas cadastradas.")
+        if it.get('valor') is None:
+            return enviar_telegram(chat_id, "Me diz o saldo. Ex.: <b>saldo nubank 1.250,40</b>")
+        conta = _casa(it.get('destino'), contas,
+                      'apelido') if it.get('destino') else None
+        if not conta and len(contas) == 1:
+            conta = contas[0]
+        if not conta:
+            self.ctx.set_pendente(chat_id, id_usuario, {
+                                  **{k: v for k, v in it.items() if not k.startswith('_')}})
+            botoes = [
+                [(c['apelido'], f"conc:{int(c['id_conta'])}")] for c in contas[:6]]
+            return enviar_telegram(chat_id, f"Saldo de {_brl(it['valor'])} é de qual conta?", botoes)
+        return self._executar_conciliacao(chat_id, id_usuario, int(conta['id_conta']), conta['apelido'], float(it['valor']))
+
+    def _executar_conciliacao(self, chat_id, id_usuario, id_conta, apelido, saldo, message_id=None):
+        r = self.conta_f.conciliar_saldo(id_conta, saldo, id_usuario)
+        diff = float(r.get('diferenca') or 0)
+        if r.get('tipo') == 'igual':
+            texto = f"✅ <b>{apelido}</b> já estava batendo: {_brl(saldo)}. Nada a ajustar."
+        elif r.get('tipo') == 'rendimento':
+            texto = (f"📈 <b>{apelido}</b> conferido: {_brl(saldo)}\n"
+                     f"Rendimento de <b>{_brl(diff)}</b> registrado como receita.")
+        elif diff > 0:
+            texto = (f"✅ <b>{apelido}</b> conferido: {_brl(saldo)}\n"
+                     f"Entrou <b>{_brl(diff)}</b> que não estava registrado — lancei como ajuste. "
+                     f"Se souber o que foi, edite a descrição no extrato.")
+        else:
+            texto = (f"⚠️ <b>{apelido}</b> conferido: {_brl(saldo)}\n"
+                     f"Saiu <b>{_brl(abs(diff))}</b> que não estava registrado (tarifa? pix?) — "
+                     f"lancei como ajuste. Vale conferir no extrato do banco.")
+        if r.get('id_lancamento'):
+            self.ctx.set_ultimo(chat_id, id_usuario, 'lancamento', int(r['id_lancamento']),
+                                f"{_brl(abs(diff))} · conciliação {apelido}")
+            botoes = [[("↩ Desfazer", "undo")]]
+        else:
+            botoes = None
+        if message_id:
+            editar_mensagem(chat_id, message_id, texto)
+            return True
+        return enviar_telegram(chat_id, texto, botoes)
+
     # ---------- registrar em CONTA (gasto / receita) ----------
     def _registrar_conta(self, chat_id, id_usuario, it: dict, message_id=None):
         contas = self._lista(self.conta_dao.get_conta(id_usuario=id_usuario))
@@ -400,6 +473,7 @@ class ControleiTelegramBot:
             'data': dt.isoformat(),
             'descricao': descricao or ('Despesa' if natureza == 'despesa' else 'Receita'),
             'id_categoria': None,
+            'origem': 'telegram',
         })
         conta_nome = next((c['apelido']
                           for c in contas if int(c['id_conta']) == id_conta), '')
