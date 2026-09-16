@@ -428,41 +428,84 @@ class ControleiDerivadosDAO(base.DAOBase):
     def get_fluxo_mensal(
             self, id_usuario: int, competencia: str = None) -> dict:
         """
-        Receitas, despesas e resultado por mês. REGRA DE OURO: só receita e
-        despesa entram; transferência e ajuste ficam de fora.
+        Fluxo por mês com as DUAS visões que "quanto gastei" tem:
+
+          COMPETÊNCIA (quando consumi): despesas_debito + despesas_credito
+              (compras no cartão pela data da compra). Responde "estou
+              gastando demais?". O pagamento de fatura NÃO entra (senão a
+              compra contaria duas vezes).
+          CAIXA (quando saiu da conta): despesas_debito + pagamento_faturas.
+              Responde "vou ter saldo?". As compras no crédito NÃO entram
+              (só saem da conta quando a fatura é paga).
+
+        Devolve os componentes; o front soma conforme a visão escolhida.
+        Receitas são iguais nas duas. REGRA DE OURO mantida: transferência
+        entre contas e ajuste ficam fora; o pagamento de fatura é lido pela
+        tabela `transferencia` (tipo pagamento_fatura), não como despesa.
         """
         rotina = 'get_fluxo_mensal'
-
         try:
             query = """
-                SELECT
-                    to_char(l.data, 'YYYY-MM') AS competencia,
-                    COALESCE(SUM(l.valor) FILTER (
-                        WHERE l.natureza = 'receita'), 0)  AS receitas,
-                    COALESCE(SUM(-l.valor) FILTER (
-                        WHERE l.natureza = 'despesa'), 0)  AS despesas,
-                    COALESCE(SUM(l.valor), 0)              AS resultado
-                FROM lancamento l
-                JOIN conta co ON co.id_conta = l.id_conta
-                WHERE co.id_usuario = %(id_usuario)s
-                  AND l.status = 'efetivado'
-                  AND l.natureza IN ('receita', 'despesa')
+                WITH deb AS (
+                    SELECT to_char(l.data, 'YYYY-MM') AS competencia,
+                           COALESCE(SUM(l.valor) FILTER (WHERE l.natureza = 'receita'), 0)  AS receitas,
+                           COALESCE(SUM(-l.valor) FILTER (WHERE l.natureza = 'despesa'), 0) AS despesas_debito
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND l.status = 'efetivado'
+                      AND l.natureza IN ('receita', 'despesa')
+                    GROUP BY 1
+                ),
+                cred AS (
+                    SELECT to_char(cp.data_compra, 'YYYY-MM') AS competencia,
+                           COALESCE(SUM(cp.valor_total), 0) AS despesas_credito
+                    FROM compra cp
+                    JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                    JOIN conta co ON co.id_conta = ca.id_conta
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND cp.cancelada = false
+                    GROUP BY 1
+                ),
+                pag AS (
+                    SELECT to_char(t.data, 'YYYY-MM') AS competencia,
+                           COALESCE(SUM(t.valor), 0) AS pagamento_faturas
+                    FROM transferencia t
+                    JOIN conta co ON co.id_conta = t.id_conta_origem
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND t.tipo = 'pagamento_fatura'
+                    GROUP BY 1
+                ),
+                meses AS (
+                    SELECT competencia FROM deb
+                    UNION SELECT competencia FROM cred
+                    UNION SELECT competencia FROM pag
+                )
+                SELECT m.competencia,
+                       COALESCE(d.receitas, 0)          AS receitas,
+                       COALESCE(d.despesas_debito, 0)   AS despesas_debito,
+                       COALESCE(c.despesas_credito, 0)  AS despesas_credito,
+                       COALESCE(p.pagamento_faturas, 0) AS pagamento_faturas,
+                       -- compatibilidade: 'despesas'/'resultado' = COMPETÊNCIA
+                       COALESCE(d.despesas_debito, 0) + COALESCE(c.despesas_credito, 0) AS despesas,
+                       COALESCE(d.receitas, 0)
+                         - COALESCE(d.despesas_debito, 0) - COALESCE(c.despesas_credito, 0) AS resultado
+                FROM meses m
+                LEFT JOIN deb d ON d.competencia = m.competencia
+                LEFT JOIN cred c ON c.competencia = m.competencia
+                LEFT JOIN pag p ON p.competencia = m.competencia
             """
-
             params = {'id_usuario': id_usuario}
-
             if competencia:
-                query += " and to_char(l.data, 'YYYY-MM') = %(competencia)s"
+                query += " WHERE m.competencia = %(competencia)s"
                 params['competencia'] = competencia
-
-            query += " GROUP BY 1 ORDER BY 1"
-
+            query += " ORDER BY 1"
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(), params=params)
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
-            raise DAOException(__file__, 'get_fluxo_mensal', erro)
+            raise DAOException(__file__, rotina, erro)
 
     def get_despesas_por_categoria(
             self, id_usuario: int, data_inicio: str, data_fim: str) -> dict:
