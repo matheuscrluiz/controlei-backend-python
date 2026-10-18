@@ -372,8 +372,11 @@ class ControleiDerivadosDAO(base.DAOBase):
             query = """
                 SELECT 'lancamento' AS fonte, l.id_lancamento AS id_registro,
                        l.natureza,
+                       -- receitas E despesas agrupam por CATEGORIA (dois lançamentos de
+                       -- salário = um grupo "Salário"); receita sem categoria
+                       -- cai na descrição pra não virar um "Sem categoria" genérico
                        CASE WHEN l.natureza = 'receita'
-                            THEN COALESCE(NULLIF(TRIM(l.descricao), ''), 'Receita')
+                            THEN COALESCE(cat.dsc_categoria, NULLIF(TRIM(l.descricao), ''), 'Receita')
                             ELSE COALESCE(cat.dsc_categoria, 'Sem categoria') END AS grupo,
                        COALESCE(l.descricao, '')     AS descricao,
                        co.apelido                     AS origem,
@@ -431,7 +434,7 @@ class ControleiDerivadosDAO(base.DAOBase):
                 WITH itens AS (
                     SELECT to_char(l.data, 'YYYY-MM') AS competencia, l.natureza,
                            CASE WHEN l.natureza = 'receita'
-                                THEN COALESCE(NULLIF(TRIM(l.descricao), ''), 'Receita')
+                                THEN COALESCE(cat.dsc_categoria, NULLIF(TRIM(l.descricao), ''), 'Receita')
                                 ELSE COALESCE(cat.dsc_categoria, 'Sem categoria') END AS grupo,
                            ABS(l.valor) AS valor
                     FROM lancamento l
@@ -450,7 +453,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                     LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
                     WHERE co.id_usuario = %(id_usuario)s AND cp.cancelada = false
                 )
-                SELECT competencia, natureza, grupo, SUM(valor) AS total
+                SELECT competencia, natureza, grupo,
+                       SUM(valor) AS total, COUNT(*) AS qtd
                 FROM itens
                 WHERE competencia <= %(fim)s
                   AND competencia >= to_char(
