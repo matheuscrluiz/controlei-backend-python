@@ -358,6 +358,146 @@ class ControleiDerivadosDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
+    def get_resumo_mes_itens(self, id_usuario: int, competencia: str) -> dict:
+        """
+        Todos os ITENS de um mês (YYYY-MM), unificados, pro "Resumo do mês":
+          * receitas e despesas em conta (lançamentos efetivados),
+          * compras no cartão pela DATA DA COMPRA (visão "o que gastei").
+        Cada item traz grupo (receita: descrição/origem; despesa: categoria),
+        conta/cartão, data, valor, se veio de recorrência (fixo) e a fonte.
+        Transferências, ajustes e pagamento de fatura NÃO entram.
+        """
+        rotina = 'get_resumo_mes_itens'
+        try:
+            query = """
+                SELECT 'lancamento' AS fonte, l.id_lancamento AS id_registro,
+                       l.natureza,
+                       CASE WHEN l.natureza = 'receita'
+                            THEN COALESCE(NULLIF(TRIM(l.descricao), ''), 'Receita')
+                            ELSE COALESCE(cat.dsc_categoria, 'Sem categoria') END AS grupo,
+                       COALESCE(l.descricao, '')     AS descricao,
+                       co.apelido                     AS origem,
+                       l.data                         AS data,
+                       ABS(l.valor)                   AS valor,
+                       (l.id_recorrencia IS NOT NULL) AS fixo,
+                       false                          AS credito,
+                       cat.dsc_categoria              AS categoria
+                FROM lancamento l
+                JOIN conta co ON co.id_conta = l.id_conta
+                LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
+                WHERE co.id_usuario = %(id_usuario)s
+                  AND l.status = 'efetivado'
+                  AND l.natureza IN ('receita', 'despesa')
+                  AND to_char(l.data, 'YYYY-MM') = %(competencia)s
+
+                UNION ALL
+
+                SELECT 'compra' AS fonte, cp.id_compra AS id_registro,
+                       'despesa' AS natureza,
+                       COALESCE(cat.dsc_categoria, 'Sem categoria') AS grupo,
+                       cp.dsc_compra                  AS descricao,
+                       ca.apelido || COALESCE(' ••' || ca.ultimos4, '') AS origem,
+                       cp.data_compra                 AS data,
+                       cp.valor_total                 AS valor,
+                       (cp.id_recorrencia IS NOT NULL) AS fixo,
+                       true                           AS credito,
+                       cat.dsc_categoria              AS categoria
+                FROM compra cp
+                JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                JOIN conta co ON co.id_conta = ca.id_conta
+                LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
+                WHERE co.id_usuario = %(id_usuario)s
+                  AND cp.cancelada = false
+                  AND to_char(cp.data_compra, 'YYYY-MM') = %(competencia)s
+                ORDER BY natureza, grupo, data DESC
+            """
+            dataframe = pd.read_sql(sql=query, con=self.get_connection(),
+                                    params={'id_usuario': id_usuario,
+                                            'competencia': competencia})
+            return self.convert_dataframe_to_dict(dataframe)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_resumo_grupos_meses(self, id_usuario: int, competencia_fim: str,
+                                meses: int = 7) -> dict:
+        """
+        Totais por (mês, natureza, grupo) dos últimos N meses até
+        competencia_fim — alimenta tendência por grupo e a média.
+        Mesma regra de grupo/visão do get_resumo_mes_itens.
+        """
+        rotina = 'get_resumo_grupos_meses'
+        try:
+            query = """
+                WITH itens AS (
+                    SELECT to_char(l.data, 'YYYY-MM') AS competencia, l.natureza,
+                           CASE WHEN l.natureza = 'receita'
+                                THEN COALESCE(NULLIF(TRIM(l.descricao), ''), 'Receita')
+                                ELSE COALESCE(cat.dsc_categoria, 'Sem categoria') END AS grupo,
+                           ABS(l.valor) AS valor
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
+                    WHERE co.id_usuario = %(id_usuario)s
+                      AND l.status = 'efetivado'
+                      AND l.natureza IN ('receita', 'despesa')
+                    UNION ALL
+                    SELECT to_char(cp.data_compra, 'YYYY-MM'), 'despesa',
+                           COALESCE(cat.dsc_categoria, 'Sem categoria'),
+                           cp.valor_total
+                    FROM compra cp
+                    JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                    JOIN conta co ON co.id_conta = ca.id_conta
+                    LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
+                    WHERE co.id_usuario = %(id_usuario)s AND cp.cancelada = false
+                )
+                SELECT competencia, natureza, grupo, SUM(valor) AS total
+                FROM itens
+                WHERE competencia <= %(fim)s
+                  AND competencia >= to_char(
+                        (%(fim)s || '-01')::date - ((%(meses)s - 1) || ' months')::interval,
+                        'YYYY-MM')
+                GROUP BY competencia, natureza, grupo
+                ORDER BY competencia, natureza, grupo
+            """
+            dataframe = pd.read_sql(sql=query, con=self.get_connection(),
+                                    params={'id_usuario': id_usuario,
+                                            'fim': competencia_fim, 'meses': meses})
+            return self.convert_dataframe_to_dict(dataframe)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_posicao_mes(self, id_usuario: int, competencia: str) -> dict:
+        """
+        Posição de fechamento do mês: patrimônio no 1º e no último snapshot
+        do mês (se houver), faturas pagas no mês e compras no crédito do mês
+        que vão pra faturas futuras.
+        """
+        rotina = 'get_posicao_mes'
+        try:
+            query = """
+                SELECT
+                    (SELECT patrimonio FROM patrimonio_snapshot
+                     WHERE id_usuario = %(u)s AND to_char(data,'YYYY-MM') = %(c)s
+                     ORDER BY data ASC LIMIT 1)  AS patrimonio_inicio,
+                    (SELECT patrimonio FROM patrimonio_snapshot
+                     WHERE id_usuario = %(u)s AND to_char(data,'YYYY-MM') = %(c)s
+                     ORDER BY data DESC LIMIT 1) AS patrimonio_fim,
+                    (SELECT COALESCE(SUM(t.valor),0) FROM transferencia t
+                     JOIN conta co ON co.id_conta = t.id_conta_origem
+                     WHERE co.id_usuario = %(u)s AND t.tipo = 'pagamento_fatura'
+                       AND to_char(t.data,'YYYY-MM') = %(c)s) AS faturas_pagas,
+                    (SELECT COALESCE(SUM(cp.valor_total),0) FROM compra cp
+                     JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                     JOIN conta co ON co.id_conta = ca.id_conta
+                     WHERE co.id_usuario = %(u)s AND cp.cancelada = false
+                       AND to_char(cp.data_compra,'YYYY-MM') = %(c)s) AS compras_credito
+            """
+            dataframe = pd.read_sql(sql=query, con=self.get_connection(),
+                                    params={'u': id_usuario, 'c': competencia})
+            return self.convert_dataframe_to_dict(dataframe)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
     def get_recentes(self, id_usuario: int, limite: int = 15) -> dict:
         """
         Últimas movimentações do usuário, UNIFICADAS: compras no cartão e
