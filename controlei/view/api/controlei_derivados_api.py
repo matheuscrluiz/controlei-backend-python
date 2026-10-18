@@ -12,8 +12,7 @@ from ...model.facade.controlei_derivados_facade import (
 # ---------------------------->>
 
 api = Namespace('controlei-derivados',
-                description='Leituras derivadas'
-                ' (saldo, dívida, fluxo, patrimônio)')
+                description='Leituras derivadas (saldo, dívida, fluxo, patrimônio)')
 
 
 # ---------------------------->>
@@ -164,6 +163,28 @@ class Projecao(Resource):
     def get(self):
         """Projeção de saldo até o fim do mês (com detalhamento)"""
         result = deriv_f().projecao(request.args.get('id_usuario'))
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
+
+
+p_resumo = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário"
+).add_argument(
+    name='competencia', type=str, required=True, help="Mês YYYY-MM"
+).add_argument(
+    name='comparar', type=str, help="anterior | media | YYYY-MM (padrão anterior)")
+
+
+@api.route('/resumo-mes')
+class ResumoMes(Resource):
+    @api.expect(p_resumo, validate=True)
+    def get(self):
+        """Resumo do mês: árvore receitas/despesas com itens, comparação,
+        média, tendência, posição de fechamento e destaques"""
+        result = deriv_f().resumo_mes(
+            request.args.get('id_usuario'),
+            request.args.get('competencia'),
+            request.args.get('comparar') or 'anterior')
         return jsonify(get_dict_retorno_endpoint(
             TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 

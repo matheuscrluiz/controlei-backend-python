@@ -153,6 +153,198 @@ class ControleiDerivadosFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
+    def resumo_mes(self, id_usuario: int, competencia: str, comparar: str = 'anterior'):
+        """
+        "Resumo do mês" — árvore completa de um mês com comparação.
+          competencia : 'YYYY-MM'
+          comparar    : 'anterior' | 'media' | 'YYYY-MM'
+        Devolve: totais, taxa de poupança, fixo×variável, pequenos gastos,
+        grupos de receita e despesa (cada um com itens, referência, média 6m
+        e série dos últimos 7 meses), posição de fechamento e destaques em
+        frases. Toda a regra fica aqui — o front só apresenta.
+        """
+        rotina = 'resumo_mes'
+        try:
+            from collections import defaultdict
+            from datetime import date as _date
+
+            comp = competencia[:7]
+            itens = convert_unique_dic_to_arrayDict(
+                self.dao.get_resumo_mes_itens(id_usuario, comp))
+            hist = convert_unique_dic_to_arrayDict(
+                self.dao.get_resumo_grupos_meses(id_usuario, comp, 7))
+            pos = convert_unique_dic_to_arrayDict(
+                self.dao.get_posicao_mes(id_usuario, comp))
+            pos = pos[0] if pos else {}
+
+            # ---- meses da janela (7: o atual + 6 anteriores) ----
+            y, m = int(comp[:4]), int(comp[5:7])
+            meses = []
+            for i in range(6, -1, -1):
+                mm, yy = m - i, y
+                while mm <= 0:
+                    mm += 12
+                    yy -= 1
+                meses.append(f"{yy:04d}-{mm:02d}")
+            # só meses COM MOVIMENTO entram na média — senão um usuário novo
+            # teria a média derrubada por meses vazios e veria alertas falsos
+            meses_com_dados = {h['competencia'] for h in hist}
+            anteriores = [mx for mx in meses[:-1] if mx in meses_com_dados]
+
+            # ---- totais por (mês, natureza, grupo) ----
+            tot = defaultdict(float)          # (mes, nat, grupo) -> total
+            tot_nat = defaultdict(float)      # (mes, nat) -> total
+            for h in hist:
+                k = (h['competencia'], h['natureza'], h['grupo'])
+                tot[k] += float(h['total'] or 0)
+                tot_nat[(h['competencia'], h['natureza'])
+                        ] += float(h['total'] or 0)
+
+            # ---- referência ----
+            if comparar == 'media':
+                ref_label = 'sua média (6 meses)'
+
+                def ref(nat, grupo=None):
+                    vals = [(tot[(mx, nat, grupo)] if grupo else tot_nat[(mx, nat)])
+                            for mx in anteriores]
+                    return sum(vals) / len(vals) if vals else 0.0
+            else:
+                ref_mes = (anteriores[-1] if comparar == 'anterior' and anteriores
+                           else (comparar[:7] if comparar != 'anterior' else None))
+                ref_label = ref_mes or 'sem mês anterior'
+
+                def ref(nat, grupo=None):
+                    if not ref_mes:
+                        return 0.0
+                    return tot[(ref_mes, nat, grupo)] if grupo else tot_nat[(ref_mes, nat)]
+
+            def media(nat, grupo=None):
+                vals = [(tot[(mx, nat, grupo)] if grupo else tot_nat[(mx, nat)])
+                        for mx in anteriores]
+                return sum(vals) / len(vals) if vals else 0.0
+
+            # ---- árvore do mês ----
+            grupos = {'receita': defaultdict(
+                list), 'despesa': defaultdict(list)}
+            for it in itens:
+                grupos[it['natureza']][it['grupo']].append({
+                    'fonte': it['fonte'], 'id_registro': int(it['id_registro']),
+                    'descricao': it['descricao'], 'origem': it['origem'],
+                    'data': str(it['data'])[:10], 'valor': float(it['valor'] or 0),
+                    'fixo': bool(it['fixo']), 'credito': bool(it['credito']),
+                    'categoria': it.get('categoria'),
+                })
+
+            def montar(nat):
+                out = []
+                for g, its in grupos[nat].items():
+                    total = sum(i['valor'] for i in its)
+                    r = ref(nat, g)
+                    md = media(nat, g)
+                    out.append({
+                        'grupo': g, 'total': round(total, 2),
+                        'referencia': round(r, 2), 'variacao': round(total - r, 2),
+                        'media': round(md, 2),
+                        'serie': [{'competencia': mx, 'total': round(tot[(mx, nat, g)], 2),
+                                   'tem_dados': mx in meses_com_dados}
+                                  for mx in meses],
+                        'fixo': all(i['fixo'] for i in its),
+                        'novo': r == 0 and total > 0,
+                        'acima_media': bool(md > 0 and total > md * 1.5),
+                        'itens': its,
+                    })
+                out.sort(key=lambda x: -x['total'])
+                return out
+
+            receitas = montar('receita')
+            despesas = montar('despesa')
+            R = sum(g['total'] for g in receitas)
+            S = sum(g['total'] for g in despesas)
+            rR, rS = ref('receita'), ref('despesa')
+            fixo = sum(i['valor']
+                       for g in despesas for i in g['itens'] if i['fixo'])
+            pequenos = [i for g in despesas for i in g['itens']
+                        if i['valor'] < 30]
+
+            # grupos que existiam na referência e sumiram
+            sumidos = []
+            if comparar != 'media':
+                for (mx, nat, g), v in tot.items():
+                    if mx == ref_label and v > 0 and not grupos[nat].get(g):
+                        sumidos.append(
+                            {'natureza': nat, 'grupo': g, 'referencia': round(v, 2)})
+
+            # ---- destaques (frases) ----
+            def brl(v):
+                v = float(v or 0)
+                return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            res = R - S
+            rres = rR - rS
+            dest = []
+            dest.append({'tipo': 'up' if res >= 0 else 'down',
+                         'texto': (f"{'Sobrou' if res >= 0 else 'Faltou'} {brl(abs(res))}"
+                                   + (f" — {'melhor' if res > rres else 'pior'} que {ref_label} ({brl(abs(rres))})." if rres else ".")
+                                   + (f" Você guardou {round(res / R * 100)}% do que entrou." if R > 0 else ""))})
+            muds = [(g, 'receita') for g in receitas] + \
+                [(g, 'despesa') for g in despesas]
+            muds = [m for m in muds if abs(m[0]['variacao']) > 0.005]
+            muds.sort(key=lambda m: -abs(m[0]['variacao']))
+            for g, nat in muds[:3]:
+                good = g['variacao'] > 0 if nat == 'receita' else g['variacao'] < 0
+                if g['novo']:
+                    dest.append(
+                        {'tipo': 'note', 'texto': f"{g['grupo']} apareceu: {brl(g['total'])} que não tinha em {ref_label}."})
+                else:
+                    pct = f" ({'+' if g['variacao'] > 0 else ''}{round(g['variacao'] / g['referencia'] * 100)}%)" if g['referencia'] else ""
+                    dest.append({'tipo': 'up' if good else 'down',
+                                 'texto': f"{g['grupo']} {'subiu' if g['variacao'] > 0 else 'caiu'} {brl(abs(g['variacao']))}{pct} vs. {ref_label}."})
+            for g in despesas:
+                if g['acima_media']:
+                    dest.append(
+                        {'tipo': 'note', 'texto': f"{g['grupo']} está {g['total'] / g['media']:.1f}× acima da sua média ({brl(g['total'])} vs. {brl(g['media'])})."})
+            for sdo in sumidos[:1]:
+                dest.append(
+                    {'tipo': 'note', 'texto': f"{sdo['grupo']} sumiu: tinha {brl(sdo['referencia'])} em {ref_label}."})
+
+            # ---- acumulado do ano ----
+            ano = comp[:4]
+            res_meses = {mx: tot_nat[(mx, 'receita')] - tot_nat[(mx, 'despesa')]
+                         for mx in meses if mx.startswith(ano) and mx <= comp
+                         and (mx in meses_com_dados or mx == comp)}
+            melhor = max(res_meses, key=res_meses.get) if res_meses else None
+            pior = min(res_meses, key=res_meses.get) if res_meses else None
+
+            return {
+                'competencia': comp, 'referencia_label': ref_label,
+                'totais': {
+                    'receitas': round(R, 2), 'despesas': round(S, 2), 'resultado': round(res, 2),
+                    'ref_receitas': round(rR, 2), 'ref_despesas': round(rS, 2), 'ref_resultado': round(rres, 2),
+                    'media_receitas': round(media('receita'), 2), 'media_despesas': round(media('despesa'), 2),
+                    'taxa_poupanca': round(res / R * 100, 1) if R > 0 else None,
+                    'fixo': round(fixo, 2), 'variavel': round(S - fixo, 2),
+                    'pequenos_total': round(sum(i['valor'] for i in pequenos), 2),
+                    'pequenos_qtd': len(pequenos),
+                },
+                'meses_com_dados': sorted(meses_com_dados),
+                'serie_resultado': [{'competencia': mx, 'tem_dados': mx in meses_com_dados,
+                                     'receitas': round(tot_nat[(mx, 'receita')], 2),
+                                     'despesas': round(tot_nat[(mx, 'despesa')], 2),
+                                     'resultado': round(tot_nat[(mx, 'receita')] - tot_nat[(mx, 'despesa')], 2)}
+                                    for mx in meses],
+                'receitas': receitas, 'despesas': despesas, 'sumidos': sumidos,
+                'posicao': {
+                    'patrimonio_inicio': pos.get('patrimonio_inicio'),
+                    'patrimonio_fim': pos.get('patrimonio_fim'),
+                    'faturas_pagas': float(pos.get('faturas_pagas') or 0),
+                    'compras_credito': float(pos.get('compras_credito') or 0),
+                },
+                'ano': {'acumulado': round(sum(res_meses.values()), 2),
+                        'melhor_mes': melhor, 'pior_mes': pior},
+                'destaques': dest[:5],
+            }
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
     def recentes(self, id_usuario: int, limite=15):
         rotina = 'recentes'
         try:
