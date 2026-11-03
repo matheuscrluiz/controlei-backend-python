@@ -99,7 +99,9 @@ class Divida(Resource):
 p_recentes = api.parser().add_argument(
     name='id_usuario', type=int, required=True, help="ID do usuário"
 ).add_argument(
-    name='limite', type=int, help="Quantidade (padrão 15)")
+    name='limite', type=int, help="Quantidade (padrão 15)"
+).add_argument(
+    name='offset', type=int, help="Deslocamento pra paginação (padrão 0)")
 
 
 p_projecao = api.parser().add_argument(
@@ -189,6 +191,21 @@ class ResumoMes(Resource):
             TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 
 
+p_inicio = api.parser().add_argument(
+    name='id_usuario', type=int, required=True, help="ID do usuário")
+
+
+@api.route('/inicio-mes')
+class InicioMes(Resource):
+    @api.expect(p_inicio, validate=True)
+    def get(self):
+        """Início: livre pra gastar, ritmo do mês, categorias, próximos
+        dias e limite dos cartões"""
+        result = deriv_f().inicio_mes(request.args.get('id_usuario'))
+        return jsonify(get_dict_retorno_endpoint(
+            TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
+
+
 @api.route('/recentes')
 class Recentes(Resource):
     @api.expect(p_recentes, validate=True)
@@ -196,7 +213,8 @@ class Recentes(Resource):
         """Últimas movimentações unificadas (compras + lançamentos)"""
         result = deriv_f().recentes(
             request.args.get('id_usuario'),
-            request.args.get('limite'))
+            request.args.get('limite'),
+            request.args.get('offset'))
         return jsonify(get_dict_retorno_endpoint(
             TIP_RETORNO_SUCESS, MSG_SUCESSO, result))
 
