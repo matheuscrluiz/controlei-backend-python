@@ -346,11 +346,200 @@ class ControleiDerivadosFacade():
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 
-    def recentes(self, id_usuario: int, limite=15):
+    def inicio_mes(self, id_usuario: int):
+        """
+        Tudo o que os cards novos do Início precisam, numa chamada:
+          livre      : entradas do mês − já gasto − contas fixas ainda por vir
+                       = livre pra gastar, e quanto dá por dia até o fim do mês
+          ritmo      : gasto acumulado dia a dia (mês atual × anterior),
+                       projeção no ritmo atual e teto total do orçamento
+          categorias : gasto por categoria (atual × anterior)
+          proximos   : próximos 30 dias — contas fixas (com valor ou "a definir"),
+                       fechamento e vencimento de fatura
+          cartoes    : limite, usado (faturas não pagas, incl. parcelas futuras)
+                       e próxima fatura de cada cartão de crédito
+        Visão "o que gastei": débito + compras no crédito pela data da compra.
+        """
+        rotina = 'inicio_mes'
+        try:
+            import calendar
+            from datetime import date, timedelta
+            from ..dao.controlei_orcamento_dao import ControleiOrcamentoDAO
+
+            def d_(x):
+                return date.fromisoformat(str(x)[:10]) if x is not None else None
+
+            def f_(x):
+                return float(x or 0)
+
+            hoje = date.today()
+            ini = hoje.replace(day=1)
+            dias_mes = calendar.monthrange(hoje.year, hoje.month)[1]
+            fim = hoje.replace(day=dias_mes)
+            fim_ant = ini - timedelta(days=1)
+            ini_ant = fim_ant.replace(day=1)
+            prox_ini = fim + timedelta(days=1)
+            prox_fim = prox_ini.replace(
+                day=calendar.monthrange(prox_ini.year, prox_ini.month)[1])
+            janela_fim = hoje + timedelta(days=30)
+
+            # ---------- ritmo ----------
+            por_dia = {d_(r['data']): f_(r['total'])
+                       for r in convert_unique_dic_to_arrayDict(
+                           self.dao.get_gastos_por_dia(id_usuario, ini_ant, fim))}
+
+            def acumulado(primeiro, ate_dia):
+                out, soma = [], 0.0
+                for k in range(ate_dia):
+                    soma += por_dia.get(primeiro + timedelta(days=k), 0.0)
+                    out.append(round(soma, 2))
+                return out
+
+            atual = acumulado(ini, hoje.day)
+            anterior = acumulado(ini_ant, fim_ant.day)
+            gasto_mes = atual[-1] if atual else 0.0
+            projecao = round(gasto_mes / hoje.day * dias_mes,
+                             2) if hoje.day >= 5 and gasto_mes else None
+            anterior_mesmo_dia = anterior[min(
+                hoje.day, len(anterior)) - 1] if anterior else 0.0
+
+            efetivo = convert_unique_dic_to_arrayDict(
+                ControleiOrcamentoDAO().get_efetivo(id_usuario, ini))
+            orcamento_total = round(
+                sum(f_(o['valor_teto']) for o in efetivo), 2)
+
+            # ---------- livre pra gastar ----------
+            e = convert_unique_dic_to_arrayDict(
+                self.dao.get_entradas_e_previstos_mes(id_usuario, ini, fim))
+            e = e[0] if e else {}
+            entradas = f_(e.get('receitas_efetivadas')) + \
+                f_(e.get('receitas_previstas'))
+            ainda_sai = f_(e.get('despesas_previstas'))
+            livre = round(entradas - gasto_mes - ainda_sai, 2)
+            dias_restantes = dias_mes - hoje.day + 1
+
+            # ---------- categorias ----------
+            cats = {}
+            comp_atual, comp_ant = ini.strftime(
+                '%Y-%m'), ini_ant.strftime('%Y-%m')
+            for r in convert_unique_dic_to_arrayDict(
+                    self.dao.get_gastos_categoria_meses(id_usuario, ini_ant, fim)):
+                c = cats.setdefault(
+                    r['categoria'], {'categoria': r['categoria'], 'atual': 0.0, 'anterior': 0.0})
+                if r['competencia'] == comp_atual:
+                    c['atual'] += f_(r['total'])
+                elif r['competencia'] == comp_ant:
+                    c['anterior'] += f_(r['total'])
+            categorias = sorted(
+                cats.values(), key=lambda c: (-c['atual'], -c['anterior']))[:8]
+            for c in categorias:
+                c['atual'], c['anterior'] = round(
+                    c['atual'], 2), round(c['anterior'], 2)
+
+            # ---------- próximos dias ----------
+            proximos = []
+            ocorr = {}
+            for o in convert_unique_dic_to_arrayDict(
+                    self.dao.get_ocorrencias_recorrencia(id_usuario, ini, prox_fim)):
+                ocorr.setdefault(
+                    (int(o['id_recorrencia']), o['competencia']), []).append(o)
+            for r in convert_unique_dic_to_arrayDict(self.dao.get_recorrencias_ativas(id_usuario)):
+                for base in (ini, prox_ini):
+                    ult = calendar.monthrange(base.year, base.month)[1]
+                    dt = base.replace(day=min(int(r['dia_do_mes']), ult))
+                    if not (hoje <= dt <= janela_fim):
+                        continue
+                    occ = ocorr.get(
+                        (int(r['id_recorrencia']), base.strftime('%Y-%m')), [])
+                    if any(o['status'] == 'efetivado' for o in occ):
+                        continue          # já aconteceu
+                    prev = [f_(o['valor']) for o in occ if o['status']
+                            == 'previsto' and f_(o['valor']) > 0.005]
+                    valor = prev[0] if prev else (
+                        f_(r['valor']) if r.get('valor') is not None else None)
+                    proximos.append({
+                        'data': dt.isoformat(), 'tipo': 'recorrencia',
+                        'descricao': r['dsc_recorrencia'], 'natureza': r['natureza'],
+                        'valor': valor, 'origem': r.get('meio'),
+                        'cartao': r.get('id_cartao') is not None,
+                    })
+
+            faturas = convert_unique_dic_to_arrayDict(
+                self.dao.get_faturas_nao_pagas_valor(id_usuario))
+            for fa in faturas:
+                nome = f"{fa['cartao']}" + \
+                    (f" ••{fa['ultimos4']}" if fa.get('ultimos4') else "")
+                fecha, vence = d_(fa['data_fechamento']), d_(
+                    fa['data_vencimento'])
+                if fa['status'] == 'aberta' and fecha and hoje <= fecha <= janela_fim:
+                    proximos.append({'data': fecha.isoformat(), 'tipo': 'fatura_fecha',
+                                     'descricao': f"Fecha fatura {nome}", 'natureza': 'despesa',
+                                     'valor': round(f_(fa['valor']), 2), 'origem': fa.get('instituicao'),
+                                     'cartao': True})
+                if vence and hoje <= vence <= janela_fim:
+                    proximos.append({'data': vence.isoformat(), 'tipo': 'fatura_vence',
+                                     'descricao': f"Vence fatura {nome}", 'natureza': 'despesa',
+                                     'valor': round(f_(fa['valor']), 2), 'origem': fa.get('instituicao'),
+                                     'cartao': True})
+            proximos.sort(key=lambda x: (x['data'], x['tipo']))
+
+            # ---------- cartões: limite usado ----------
+            cartoes = []
+            for ca in convert_unique_dic_to_arrayDict(self.dao.get_cartoes_credito(id_usuario)):
+                fs = [fa for fa in faturas if int(
+                    fa['id_cartao']) == int(ca['id_cartao'])]
+                usado = round(sum(f_(fa['valor']) for fa in fs), 2)
+                aberta = next((fa for fa in sorted(fs, key=lambda x: str(x['competencia']))
+                               if fa['status'] == 'aberta'), None)
+                limite = f_(ca['limite']) if ca.get(
+                    'limite') is not None else None
+                cartoes.append({
+                    'id_cartao': int(ca['id_cartao']), 'apelido': ca['apelido'],
+                    'ultimos4': ca.get('ultimos4'), 'instituicao': ca.get('instituicao'),
+                    'limite': limite, 'usado': usado,
+                    'disponivel': round(limite - usado, 2) if limite is not None else None,
+                    'fatura_atual': round(f_(aberta['valor']), 2) if aberta else 0.0,
+                    'fecha_em': str(aberta['data_fechamento'])[:10] if aberta else None,
+                })
+
+            return {
+                'hoje': hoje.isoformat(), 'competencia': comp_atual,
+                'competencia_anterior': comp_ant,
+                'livre': {
+                    'entradas': round(entradas, 2),
+                    'entradas_recebidas': round(f_(e.get('receitas_efetivadas')), 2),
+                    'gasto': round(gasto_mes, 2),
+                    'ainda_vai_sair': round(ainda_sai, 2),
+                    'previstos_sem_valor': int(e.get('previstos_sem_valor') or 0),
+                    'livre': livre,
+                    'dias_restantes': dias_restantes,
+                    'por_dia': round(livre / dias_restantes, 2) if livre > 0 else 0.0,
+                },
+                'ritmo': {
+                    'dias_mes': dias_mes, 'dias_mes_anterior': fim_ant.day,
+                    'atual': atual, 'anterior': anterior,
+                    'gasto_ate_hoje': round(gasto_mes, 2),
+                    'anterior_mesmo_dia': round(anterior_mesmo_dia, 2),
+                    'projecao_fim': projecao,
+                    'orcamento_total': orcamento_total,
+                },
+                'categorias': categorias,
+                'proximos': proximos[:8],
+                'cartoes': cartoes,
+            }
+        except Exception as erro:
+            raise FacadeException(__file__, rotina, erro)
+
+    def recentes(self, id_usuario: int, limite=15, offset=0):
+        """Página de últimos registros: {itens, total} pra paginação."""
         rotina = 'recentes'
         try:
-            return convert_unique_dic_to_arrayDict(
-                self.dao.get_recentes(id_usuario, int(limite or 15)))
+            itens = convert_unique_dic_to_arrayDict(
+                self.dao.get_recentes(id_usuario, int(limite or 15), int(offset or 0)))
+            total = int(itens[0]['total']) if itens else 0
+            for i in itens:
+                i.pop('total', None)
+            return {'itens': itens, 'total': total}
         except Exception as erro:
             raise FacadeException(__file__, rotina, erro)
 

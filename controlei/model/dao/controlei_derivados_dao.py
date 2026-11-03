@@ -502,7 +502,198 @@ class ControleiDerivadosDAO(base.DAOBase):
         except DAOException as erro:
             raise DAOException(__file__, rotina, erro)
 
-    def get_recentes(self, id_usuario: int, limite: int = 15) -> dict:
+    # ------------------------------------------------------------------
+    # INÍCIO (dashboard) — dados do mês em andamento
+    # Visão "o que gastei": despesa = débito efetivado + compras no crédito
+    # pela data da compra. Transferência, aporte e pagamento de fatura NÃO
+    # entram (regra de ouro).
+    # ------------------------------------------------------------------
+    def get_gastos_por_dia(self, id_usuario: int, inicio, fim) -> dict:
+        """Gasto total por dia no intervalo [inicio, fim] (datas)."""
+        rotina = 'get_gastos_por_dia'
+        try:
+            query = """
+                SELECT data, SUM(valor) AS total FROM (
+                    SELECT l.data AS data, ABS(l.valor) AS valor
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    WHERE co.id_usuario = %(u)s
+                      AND l.status = 'efetivado' AND l.natureza = 'despesa'
+                      AND l.data BETWEEN %(ini)s AND %(fim)s
+                    UNION ALL
+                    SELECT cp.data_compra, cp.valor_total
+                    FROM compra cp
+                    JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                    JOIN conta co ON co.id_conta = ca.id_conta
+                    WHERE co.id_usuario = %(u)s AND cp.cancelada = false
+                      AND cp.data_compra BETWEEN %(ini)s AND %(fim)s
+                ) x
+                GROUP BY data ORDER BY data
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario, 'ini': inicio, 'fim': fim})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_gastos_categoria_meses(self, id_usuario: int, inicio, fim) -> dict:
+        """Gasto por (mês, categoria) no intervalo — atual × anterior."""
+        rotina = 'get_gastos_categoria_meses'
+        try:
+            query = """
+                SELECT to_char(data, 'YYYY-MM') AS competencia,
+                       COALESCE(categoria, 'Sem categoria') AS categoria,
+                       SUM(valor) AS total
+                FROM (
+                    SELECT l.data, cat.dsc_categoria AS categoria, ABS(l.valor) AS valor
+                    FROM lancamento l
+                    JOIN conta co ON co.id_conta = l.id_conta
+                    LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
+                    WHERE co.id_usuario = %(u)s
+                      AND l.status = 'efetivado' AND l.natureza = 'despesa'
+                      AND l.data BETWEEN %(ini)s AND %(fim)s
+                    UNION ALL
+                    SELECT cp.data_compra, cat.dsc_categoria, cp.valor_total
+                    FROM compra cp
+                    JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                    JOIN conta co ON co.id_conta = ca.id_conta
+                    LEFT JOIN categoria cat ON cat.id_categoria = cp.id_categoria
+                    WHERE co.id_usuario = %(u)s AND cp.cancelada = false
+                      AND cp.data_compra BETWEEN %(ini)s AND %(fim)s
+                ) x
+                GROUP BY 1, 2
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario, 'ini': inicio, 'fim': fim})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_entradas_e_previstos_mes(self, id_usuario: int, inicio, fim) -> dict:
+        """No mês: receitas efetivadas e lançamentos PREVISTOS (contas fixas
+        geradas pelo job), por natureza. Previsto com valor 0 = variável."""
+        rotina = 'get_entradas_e_previstos_mes'
+        try:
+            query = """
+                SELECT
+                  COALESCE(SUM(l.valor) FILTER (WHERE l.status = 'efetivado'
+                           AND l.natureza = 'receita'), 0)               AS receitas_efetivadas,
+                  COALESCE(SUM(l.valor) FILTER (WHERE l.status = 'previsto'
+                           AND l.natureza = 'receita'), 0)               AS receitas_previstas,
+                  COALESCE(SUM(-l.valor) FILTER (WHERE l.status = 'previsto'
+                           AND l.natureza = 'despesa'), 0)               AS despesas_previstas,
+                  COUNT(*) FILTER (WHERE l.status = 'previsto'
+                           AND ABS(l.valor) < 0.005)                     AS previstos_sem_valor
+                FROM lancamento l
+                JOIN conta co ON co.id_conta = l.id_conta
+                WHERE co.id_usuario = %(u)s
+                  AND l.natureza IN ('receita', 'despesa')
+                  AND l.data BETWEEN %(ini)s AND %(fim)s
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario, 'ini': inicio, 'fim': fim})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_recorrencias_ativas(self, id_usuario: int) -> dict:
+        """Recorrências ativas com o meio (conta ou cartão) pra montar os
+        próximos dias."""
+        rotina = 'get_recorrencias_ativas'
+        try:
+            query = """
+                SELECT r.id_recorrencia, r.dsc_recorrencia, r.natureza, r.valor,
+                       r.dia_do_mes, r.id_conta, r.id_cartao,
+                       COALESCE(co.apelido, ca.apelido) AS meio
+                FROM recorrencia r
+                LEFT JOIN conta co  ON co.id_conta = r.id_conta
+                LEFT JOIN cartao ca ON ca.id_cartao = r.id_cartao
+                WHERE r.id_usuario = %(u)s AND r.ativa = true
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_ocorrencias_recorrencia(self, id_usuario: int, inicio, fim) -> dict:
+        """Lançamentos e compras gerados por recorrência no intervalo — pra
+        saber se a ocorrência já aconteceu (efetivado) ou está prevista."""
+        rotina = 'get_ocorrencias_recorrencia'
+        try:
+            query = """
+                SELECT l.id_recorrencia, to_char(l.data, 'YYYY-MM') AS competencia,
+                       l.status, ABS(l.valor) AS valor
+                FROM lancamento l
+                JOIN conta co ON co.id_conta = l.id_conta
+                WHERE co.id_usuario = %(u)s AND l.id_recorrencia IS NOT NULL
+                  AND l.data BETWEEN %(ini)s AND %(fim)s
+                UNION ALL
+                SELECT cp.id_recorrencia, to_char(cp.data_compra, 'YYYY-MM'),
+                       'efetivado', cp.valor_total
+                FROM compra cp
+                JOIN cartao ca ON ca.id_cartao = cp.id_cartao
+                JOIN conta co ON co.id_conta = ca.id_conta
+                WHERE co.id_usuario = %(u)s AND cp.id_recorrencia IS NOT NULL
+                  AND cp.cancelada = false
+                  AND cp.data_compra BETWEEN %(ini)s AND %(fim)s
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario, 'ini': inicio, 'fim': fim})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_faturas_nao_pagas_valor(self, id_usuario: int) -> dict:
+        """Faturas não pagas com o valor calculado (parcelas + itens) e o
+        cartão — alimenta próximos dias (fecha/vence) e limite usado."""
+        rotina = 'get_faturas_nao_pagas_valor'
+        try:
+            query = """
+                SELECT f.id_fatura, f.id_cartao, f.competencia, f.status,
+                       f.data_fechamento, f.data_vencimento,
+                       ca.apelido AS cartao, ca.ultimos4, ca.limite,
+                       ca.dia_fechamento, ca.dia_vencimento,
+                       i.dsc_instituicao AS instituicao,
+                       COALESCE((SELECT SUM(p.valor_parcela) FROM parcela p
+                                 JOIN compra cp ON cp.id_compra = p.id_compra
+                                 WHERE p.id_fatura = f.id_fatura AND cp.cancelada = false), 0)
+                     + COALESCE((SELECT SUM(fi.valor) FROM fatura_item fi
+                                 WHERE fi.id_fatura = f.id_fatura), 0) AS valor
+                FROM fatura f
+                JOIN cartao ca ON ca.id_cartao = f.id_cartao
+                JOIN conta co  ON co.id_conta = ca.id_conta
+                LEFT JOIN instituicao i ON i.id_instituicao = co.id_instituicao
+                WHERE co.id_usuario = %(u)s AND f.status <> 'paga'
+                ORDER BY f.data_vencimento
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_cartoes_credito(self, id_usuario: int) -> dict:
+        """Cartões com função de crédito (pra mostrar limite mesmo sem fatura)."""
+        rotina = 'get_cartoes_credito'
+        try:
+            query = """
+                SELECT ca.id_cartao, ca.apelido, ca.ultimos4, ca.limite,
+                       ca.dia_fechamento, ca.dia_vencimento,
+                       i.dsc_instituicao AS instituicao
+                FROM cartao ca
+                JOIN conta co ON co.id_conta = ca.id_conta
+                LEFT JOIN instituicao i ON i.id_instituicao = co.id_instituicao
+                WHERE co.id_usuario = %(u)s AND ca.funcao IN ('credito', 'multiplo')
+                ORDER BY ca.apelido
+            """
+            df = pd.read_sql(sql=query, con=self.get_connection(),
+                             params={'u': id_usuario})
+            return self.convert_dataframe_to_dict(df)
+        except DAOException as erro:
+            raise DAOException(__file__, rotina, erro)
+
+    def get_recentes(self, id_usuario: int, limite: int = 15, offset: int = 0) -> dict:
         """
         Últimas movimentações do usuário, UNIFICADAS: compras no cartão e
         lançamentos em conta (receita/despesa), ordenadas da mais recente.
@@ -513,7 +704,7 @@ class ControleiDerivadosDAO(base.DAOBase):
 
         try:
             query = """
-                SELECT * FROM (
+                SELECT t.*, COUNT(*) OVER() AS total FROM (
                     SELECT
                         'compra'            AS origem,
                         cp.id_compra        AS id_registro,
@@ -527,7 +718,13 @@ class ControleiDerivadosDAO(base.DAOBase):
                         NULL::integer       AS id_conta,
                         cp.id_categoria     AS id_categoria,
                         cat.dsc_categoria   AS dsc_categoria,
-                        cp.cancelada        AS cancelada
+                        cp.cancelada        AS cancelada,
+                        -- alguma parcela em fatura paga? → no form, só
+                        -- descrição e categoria podem mudar
+                        EXISTS (SELECT 1 FROM parcela pa
+                                JOIN fatura fa ON fa.id_fatura = pa.id_fatura
+                                WHERE pa.id_compra = cp.id_compra
+                                  AND fa.status = 'paga') AS tem_parcela_paga
                     FROM compra cp
                     JOIN cartao ca   ON ca.id_cartao = cp.id_cartao
                     JOIN conta co    ON co.id_conta = ca.id_conta
@@ -550,7 +747,8 @@ class ControleiDerivadosDAO(base.DAOBase):
                         l.id_conta          AS id_conta,
                         l.id_categoria      AS id_categoria,
                         cat.dsc_categoria   AS dsc_categoria,
-                        false               AS cancelada
+                        false               AS cancelada,
+                        false               AS tem_parcela_paga
                     FROM lancamento l
                     JOIN conta co ON co.id_conta = l.id_conta
                     LEFT JOIN categoria cat ON cat.id_categoria = l.id_categoria
@@ -559,11 +757,12 @@ class ControleiDerivadosDAO(base.DAOBase):
                       AND l.status = 'efetivado'
                 ) t
                 ORDER BY t.data DESC, t.id_registro DESC
-                LIMIT %(limite)s
+                LIMIT %(limite)s OFFSET %(offset)s
             """
             dataframe = pd.read_sql(
                 sql=query, con=self.get_connection(),
-                params={'id_usuario': id_usuario, 'limite': limite})
+                params={'id_usuario': id_usuario, 'limite': limite,
+                        'offset': offset})
             return self.convert_dataframe_to_dict(dataframe)
 
         except DAOException as erro:
